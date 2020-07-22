@@ -97,6 +97,7 @@ else
   pyenv install $PYTHON_VER
   export PYENV_VERSION=$PYTHON_VER
 
+  pip install packaging
   python setup.py build
   python setup.py install
 
