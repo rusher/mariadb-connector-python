@@ -97,11 +97,11 @@ else
   pyenv install $PYTHON_VER
   export PYENV_VERSION=$PYTHON_VER
 
-  pip install packaging
+  pip install packaging coverage
   python setup.py build
   python setup.py install
 
-  python -m unittest discover -v
+  coverage run -m unittest discover -v
 fi
 
 
