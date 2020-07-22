@@ -60,6 +60,7 @@ if [ -n "$BENCH" ] ; then
 
 
   export PYENV_VERSION=3.8.0
+  pip install packaging
   python setup.py build
   python setup.py install
   pip install mysql-connector-python pyperf
