@@ -39,7 +39,7 @@ install:
   - export TEST_SSL_CLIENT_KEY_FILE=$SSLCERT/client.key
   - export TEST_SSL_CLIENT_CERT_FILE=$SSLCERT/client.crt
   - export TEST_SSL_CLIENT_KEYSTORE_FILE=$SSLCERT/client-keystore.p12
-  - pip install codecov
+  - pip install codecov packaging
 
 env:
   global:
