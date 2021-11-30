@@ -323,7 +323,7 @@ class PacketWriter:
         return self.mark != -1
 
     def has_flushed(self):
-        return self.sequence.get() != -1
+        return self.sequence.value != -1
 
     def flush_buffer_stop_at_mark(self):
         self.end = self.pos

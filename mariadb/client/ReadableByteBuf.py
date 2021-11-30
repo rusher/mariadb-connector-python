@@ -10,12 +10,13 @@ LONG_UNSIGNED_PARSER = struct.Struct('<Q')
 
 class ReadableByteBuf:
 
-    __slots__ = ('sequence', 'pos', 'buf', 'limit')
+    __slots__ = ('sequence', 'pos', 'buf', 'limit', 'view')
 
     def __init__(self, sequence, buf, pos, limit):
         self.sequence = sequence
         self.pos = pos
         self.buf = buf
+        self.view = memoryview(buf)
         self.limit = limit
 
     def readable_bytes(self):
@@ -24,6 +25,7 @@ class ReadableByteBuf:
     def reset(self, buf, pos, limit):
         self.pos = pos
         self.buf = buf
+        self.view = memoryview(buf)
         self.limit = limit
 
     def skip_one(self):
@@ -72,14 +74,14 @@ class ReadableByteBuf:
         if length is None:
             return None
         self.pos += length
-        return int(memoryview(self.buf)[self.pos - length: self.pos])
+        return int(self.view[self.pos - length: self.pos])
 
     def read_float_length_encoded(self) -> float:
         length = self.read_length()
         if length is None:
             return None
         self.pos += length
-        return float(memoryview(self.buf)[self.pos - length: self.pos])
+        return float(self.view[self.pos - length: self.pos])
 
     def read_date_length_encoded(self) -> date:
         length = self.read_length()
@@ -129,7 +131,7 @@ class ReadableByteBuf:
         if length is None:
             return None
         self.pos += length
-        return self.buf[self.pos - length: self.pos].decode()
+        return str(self.view[self.pos - length: self.pos], 'utf8')
 
     def skip_identifier(self) -> int:
         length = self.buf[self.pos] & 0xff
@@ -216,7 +218,7 @@ class ReadableByteBuf:
 
     def read_buffer(self, length):
         self.pos += length
-        return memoryview(self.buf)[self.pos - length: self.pos]
+        return self.view[self.pos - length: self.pos]
 
     def readablebuffer(self):
         return ReadableByteBuf(self.sequence, self.buf[self.pos: self.limit], 0, self.limit - self.pos)
@@ -230,22 +232,22 @@ class ReadableByteBuf:
 
     def read_string(self, length):
         self.pos += length
-        return self.buf[self.pos - length: self.pos].decode()
+        return str(self.view[self.pos - length: self.pos], 'utf8')
 
     def read_ascii(self, length):
         self.pos += length
-        return self.buf[self.pos - length: self.pos].decode('ascii')
+        return str(self.view[self.pos - length: self.pos],'ascii')
 
     def read_string_null_end(self):
         cnt = 0
         while self.readable_bytes() > cnt and self.buf[self.pos + cnt] != 0:
             cnt += 1
-        dst = self.buf[self.pos: self.pos + cnt].decode()
+        dst = str(self.view[self.pos: self.pos + cnt], 'utf8')
         self.pos += cnt + 1
         return dst
 
     def read_string_eof(self):
-        dst = self.buf[self.pos: self.limit].decode()
+        dst = str(self.view[self.pos: self.limit], 'utf8')
         self.pos = self.limit
         return dst
 

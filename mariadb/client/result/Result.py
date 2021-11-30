@@ -73,7 +73,7 @@ class Result:
             return self.parser(buf)
 
     def decode_binary(self, buf: ReadableByteBuf) -> tuple:
-        buf.skip_one() # skip header
+        buf.skip_one()
         null_bitmap = buf.read_buffer(int((self.meta_len + 9) / 8))
         for i, parse_fct in enumerate(self.parse_fcts):
             if (null_bitmap[int((i + 2) / 8)] & (1 << ((i + 2) % 8))) > 0:

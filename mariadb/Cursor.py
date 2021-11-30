@@ -2,6 +2,7 @@ from threading import RLock
 
 from mariadb.client.Client import Client
 from mariadb.client.result.Result import Result
+from mariadb.message.client.BulkExecutePacket import BulkExecutePacket
 from mariadb.message.client.ExecutePacket import ExecutePacket
 from mariadb.message.client.PreparePacket import PreparePacket
 from mariadb.message.client.QueryPacket import QueryPacket
@@ -9,7 +10,7 @@ from mariadb.message.client.QueryWithParametersPacket import QueryWithParameters
 from mariadb.message.server.OkPacket import OkPacket
 from mariadb.util.ClientParser import parameter_parts
 from mariadb.util.ExceptionFactory import ExceptionFactory
-from mariadb.util.constant import ServerStatus
+from mariadb.util.constant import ServerStatus, Capabilities
 
 
 class Cursor:
@@ -26,7 +27,6 @@ class Cursor:
 
         self.__executemany = self.__executemany_binary if client.conf.get(
             "use_binary") else self.__executemany_text
-
 
     def __exception_factory(self) -> ExceptionFactory:
         return self.__client.exception_factory.of_stmt(self)
@@ -149,15 +149,45 @@ class Cursor:
     def __executemany_binary(self, sql: str, batch_parameters) -> None:
         self.prepare = self.__client.context.prepare_cache.get(sql)
         msgs = []
-        if not self.prepare:
-            msgs.append(PreparePacket(sql, self.__client))
-            statement_id = -1
+        if (self.__client.context.server_capabilities & Capabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS) > 0:
+            if self.__client.conf.get("use_bulk"):
+                if not self.prepare:
+                    msgs.append(PreparePacket(sql, self.__client))
+                    statement_id = -1
+                else:
+                    statement_id = self.prepare.statement_id
+                msgs.append(BulkExecutePacket(statement_id, batch_parameters, sql))
+                self.__results = self.__client.execute_pipeline(msgs, self, self.__arraysize)
+
+                # remove prepare result
+                if statement_id == -1:
+                    self.__results.pop(0)
+            else:
+                # bulk disable, use pipelining
+                if not self.prepare:
+                    msgs.append(PreparePacket(sql, self.__client))
+                    statement_id = -1
+                else:
+                    statement_id = self.prepare.statement_id
+
+                for params in batch_parameters:
+                    msgs.append(ExecutePacket(statement_id, params, sql))
+                self.__results = self.__client.execute_pipeline(msgs, self, self.__arraysize)
+
+                # remove prepare result
+                if statement_id == -1:
+                    self.__results.pop(0)
         else:
+            # pipelining not possible, just loop
+
+            if not self.prepare:
+                self.prepare = self.__client.execute(PreparePacket(sql, self.__client), self, self.__arraysize)[0]
             statement_id = self.prepare.statement_id
 
-        for params in batch_parameters:
-            msgs.append(ExecutePacket(statement_id, params, sql))
-        self.__results = self.__client.execute_pipeline(msgs, self, self.__arraysize)
+            res = []
+            for params in batch_parameters:
+                res.append(self.__client.execute(ExecutePacket(statement_id, params, sql), self, self.__arraysize))
+            self.__results = res
 
     def setinputsizes(self, sizes) -> None:
         pass
@@ -203,13 +233,16 @@ class Cursor:
             if self.prepare:
                 self.__results = self.__client.execute(ExecutePacket(self.prepare.statement_id, params, sql), self,
                                                        self.__arraysize)
-            else:
+            elif (self.__client.context.server_capabilities & Capabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS) > 0:
+                # pipelining only for MariaDB servers
                 msgs = [
                     PreparePacket(sql, self.__client),
                     ExecutePacket(-1, params, sql)
                 ]
                 self.__results = self.__client.execute_pipeline(msgs, self, self.__arraysize)
-
+            else:
+                self.prepare = self.__client.execute(PreparePacket(sql, self.__client), self, self.__arraysize)[0]
+                self.__results = self.__client.execute(ExecutePacket(self.prepare, params, sql), self, self.__arraysize)
         finally:
             self.__lock.release()
 

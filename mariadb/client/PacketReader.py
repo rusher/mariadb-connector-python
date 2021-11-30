@@ -18,7 +18,7 @@ class PacketReader:
         self.max_query_size_to_log = conf.get('max_query_size_to_log')
         self.sequence = sequence
         self.server_thread_log = ""
-        self.readable = ReadableByteBuf(self.sequence, None, 0, 0)
+        self.readable = ReadableByteBuf(self.sequence, bytearray(), 0, 0)
 
     def read_packet(self) -> ReadableByteBuf:
         # ***************************************************

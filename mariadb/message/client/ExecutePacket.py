@@ -8,6 +8,7 @@ from mariadb.message.client.LongDataPacket import LongDataPacket
 
 
 class ExecutePacket(ClientMessage):
+    __slots__ = ('statement_id', 'parameters', 'sql')
 
     def __init__(self, statement_id: int, parameters, sql: str):
         self.parameters = parameters
@@ -44,30 +45,7 @@ class ExecutePacket(ClientMessage):
                 if p is None:
                     null_bits_buffer[i / 8] |= (1 << (i % 8))
                 else:
-
-                    if type(p) is bool:
-                        byte_type = DataType.VARSTRING
-                    elif type(p) is str or type(p) is dict:
-                        byte_type = DataType.VARSTRING
-                    elif type(p) is int:
-                        if -2147483648 < p < +2147483647:
-                            byte_type = DataType.INTEGER
-                        else:
-                            byte_type = DataType.BIGINT
-                    elif type(p) is float:
-                        byte_type = DataType.DECIMAL
-                    elif type(p) is datetime:
-                        byte_type = DataType.DATETIME
-                    elif type(p) is date:
-                        byte_type = DataType.DATE
-                    elif type(p) is time:
-                        byte_type = DataType.TIME
-                    elif type(p) is bytes or type(p) is bytearray or type(p) is memoryview:
-                        byte_type = DataType.BLOB
-                    else:
-                        raise Exception('type ' + type(p) + ' is not supported')
-
-                    writer.write_byte(byte_type.value)
+                    writer.write_byte(param_datatype(p).value)
                     writer.write_byte(0)
 
             # write nullBitsBuffer in reserved place
@@ -153,3 +131,26 @@ def write_param(writer: PacketWriter, param) -> None:
         writer.write_bytes(param, 0, len(param))
     else:
         raise Exception('type ' + type(param) + ' is not supported')
+
+
+def param_datatype(p) -> DataType:
+    if type(p) is bool:
+        return DataType.TINYINT
+    elif type(p) is str or type(p) is dict:
+        return DataType.VARSTRING
+    elif type(p) is int:
+        if -2147483648 < p < +2147483647:
+            return DataType.INTEGER
+        else:
+            return DataType.BIGINT
+    elif type(p) is float:
+        return DataType.DECIMAL
+    elif type(p) is datetime:
+        return DataType.DATETIME
+    elif type(p) is date:
+        return DataType.DATE
+    elif type(p) is time:
+        return DataType.TIME
+    elif type(p) is bytes or type(p) is bytearray or type(p) is memoryview:
+        return DataType.BLOB
+    raise Exception('type ' + type(p) + ' is not supported')

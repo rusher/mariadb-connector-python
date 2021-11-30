@@ -184,7 +184,7 @@ class Client:
                 server_capabilities & Capabilities.MARIADB_CLIENT_CACHE_METADATA) != 0:
             capabilities |= Capabilities.MARIADB_CLIENT_CACHE_METADATA
 
-        if conf.get('use_bulk_stmts'):
+        if conf.get('use_bulk'):
             capabilities |= Capabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS
 
         if not conf.get('use_affected_rows'):

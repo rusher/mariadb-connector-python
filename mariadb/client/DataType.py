@@ -21,13 +21,13 @@ def default_text_parse(buf: ReadableByteBuf, col):
             return value.split(',')
     return value
 
-def read_json_text(buf: ReadableByteBuf):
+def read_json_text(buf: ReadableByteBuf, col=None):
     return json.loads(buf.read_string_length_encoded())
 
-def read_buffer_text(buf: ReadableByteBuf):
+def read_buffer_text(buf: ReadableByteBuf, col=None):
     return buf.read_length_buffer()
 
-def read_string_text(buf: ReadableByteBuf):
+def read_string_text(buf: ReadableByteBuf, col=None):
     return buf.read_string_length_encoded()
 
 def read_float_length_encoded(buf: ReadableByteBuf):
@@ -139,19 +139,19 @@ class DataType(bytes, Enum):
     DATETIME = (12, read_datetime_length_encoded, read_datetime)
     YEAR = (13, read_int_length_encoded, read_small)
     NEWDATE = (14, read_date_length_encoded, read_date)
-    VARCHAR = (15, read_string_text, default_text_parse)
-    BIT = (16, read_buffer_text, default_text_parse)
+    VARCHAR = (15, read_string_text, read_string_text)
+    BIT = (16, read_buffer_text, read_buffer_text)
     JSON = (245, read_json_text, lambda c, b: b.loads(b.read_string_length_encoded()))
     DECIMAL = (246, read_float_length_encoded, read_decimal)
-    ENUM = (247, read_string_text, default_text_parse)
-    SET = (248, read_string_text, default_text_parse)
-    TINYBLOB = (249, read_buffer_text, default_text_parse)
-    MEDIUMBLOB = (250, read_buffer_text, default_text_parse)
-    LONGBLOB = (251, read_buffer_text, default_text_parse)
-    BLOB = (252, read_buffer_text, default_text_parse)
-    VARSTRING = (253, read_string_text, default_text_parse)
-    STRING = (254, read_string_text, default_text_parse)
-    GEOMETRY = (255, read_buffer_text, default_text_parse)
+    ENUM = (247, read_string_text, read_string_text)
+    SET = (248, read_string_text, read_string_text)
+    TINYBLOB = (249, read_buffer_text, read_buffer_text)
+    MEDIUMBLOB = (250, read_buffer_text, read_buffer_text)
+    LONGBLOB = (251, read_buffer_text, read_buffer_text)
+    BLOB = (252, read_buffer_text, read_buffer_text)
+    VARSTRING = (253, read_string_text, read_string_text)
+    STRING = (254, read_string_text, read_string_text)
+    GEOMETRY = (255, read_buffer_text, read_buffer_text)
 
     def __new__(cls, value, parse_text, parse_binary):
         obj = bytes.__new__(cls, [value])

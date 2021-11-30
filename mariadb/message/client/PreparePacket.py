@@ -11,6 +11,9 @@ from mariadb.util.ExceptionFactory import ExceptionFactory
 
 
 class PreparePacket(ClientMessage):
+
+    __slots__ = ('sql', 'client')
+
     def __init__(self, sql: str, client):
         self.sql = sql
         self.client = client

@@ -23,7 +23,7 @@ def connect(**arg) -> Connection:
     conf.setdefault("tcp_abortive_close", False)
     conf.setdefault("max_query_size_to_log", 1024)
     conf.setdefault("use_binary", True)
-    conf.setdefault("use_bulk_stmts", True)
+    conf.setdefault("use_bulk", True)
     conf.setdefault("use_affected_rows", False)
     conf.setdefault("allow_multi_queries", False)
     conf.setdefault("allow_local_infile", False)
