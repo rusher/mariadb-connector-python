@@ -11,6 +11,7 @@ def select_1(loops, conn):
     for value in range_it:
         cursor.execute("select 1")
         row = cursor.fetchall()
+        cursor.execute('do 1')
     cursor.close()
 
     return pyperf.perf_counter() - t0

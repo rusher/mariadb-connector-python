@@ -12,12 +12,13 @@ def bulk(loops, conn):
     vals = [(i,) for i in range(10000)]
     range_it = range(loops)
     for value in range_it:
-        cursor.executemany("INSERT INTO test_update_bulk VALUES (%s, NULL)", vals);
+        cursor.executemany("INSERT INTO test_update_bulk VALUES (?, NULL)", vals);
         conn.commit()
-        cursor.executemany("UPDATE test_update_bulk SET b=2 WHERE a=%s", vals);
+        cursor.executemany("UPDATE test_update_bulk SET b=2 WHERE a=?", vals);
         conn.commit()
-        cursor.executemany("DELETE FROM test_update_bulk WHERE a=%s", vals);
+        cursor.executemany("DELETE FROM test_update_bulk WHERE a=?", vals);
         conn.commit()
+        cursor.execute('do 1')
     cursor.execute("DROP TABLE IF EXISTS test_update_bulk")
     del cursor
     return pyperf.perf_counter() - t0

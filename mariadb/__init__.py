@@ -1,50 +1,43 @@
-'''
-MariaDB Connector/Python enables python programs to access MariaDB and MySQL 
-atabases, using an API which is compliant with the Python DB API 2.0 (PEP-249).
-It is written in C and uses MariaDB Connector/C client library for client
-server communication.
+import threading
 
-Minimum supported Python version is 3.6
-'''
+from mariadb.Connection import Connection
+from mariadb.HostAddress import HostAddress
+from mariadb.client.Client import Client
 
-from ._mariadb import (
-    BINARY,
-    Binary,
-    connection,
-    ConnectionPool,
-    DATETIME,
-    DataError,
-    DatabaseError,
-    Date,
-    DateFromTicks,
-    Error,
-    IntegrityError,
-    InterfaceError,
-    InternalError,
-    NUMBER,
-    NotSupportedError,
-    OperationalError,
-    PoolError,
-    ProgrammingError,
-    ROWID,
-    STRING,
-    Time,
-    TimeFromTicks,
-    Timestamp,
-    TimestampFromTicks,
-    Warning,
-    _CONNECTION_POOLS,
-    __version__,
-    __version_info__,
-    apilevel,
-    paramstyle,
-    threadsafety,
-    connect,
-    fieldinfo,
-    mariadbapi_version,
-)
+threadsafety = 1
+apilevel = "2.0"
+paramstyle = "qmark"
 
-'''
-test attribute
-'''
-test=1
+
+def connect(**arg) -> Connection:
+    conf = dict(arg)
+
+    conf.setdefault("host", "localhost")
+    conf.setdefault("port", 3306)
+    conf.setdefault("non_mapped_options", {})
+    conf.setdefault("socket_timeout", 30)
+    conf.setdefault("pipe")
+    conf.setdefault("local_socket")
+    conf.setdefault("local_socket_address")
+    conf.setdefault("tcp_keep_alive", False)
+    conf.setdefault("tcp_abortive_close", False)
+    conf.setdefault("max_query_size_to_log", 1024)
+    conf.setdefault("use_binary", True)
+    conf.setdefault("use_bulk_stmts", True)
+    conf.setdefault("use_affected_rows", False)
+    conf.setdefault("allow_multi_queries", False)
+    conf.setdefault("allow_local_infile", False)
+    conf.setdefault("use_compression", False)
+    conf.setdefault("dump_queries_on_exception", False)
+    conf.setdefault("show_innodb_dead_lock", False)
+
+    conf.setdefault("database")
+    conf.setdefault("prep_stmt_cache_size", 250)
+    conf.setdefault("user")
+    conf.setdefault("password")
+    conf.setdefault("connection_attributes")
+
+    host_address = HostAddress(conf.get("host"), conf.get("port", 3306))
+    lock = threading.RLock()
+    client = Client(conf, host_address, lock)
+    return Connection(conf, lock, client)

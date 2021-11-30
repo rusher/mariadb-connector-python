@@ -1,49 +1,11 @@
 #!/usr/bin/env python
+from setuptools import setup, find_packages
 
-import os
-
-from setuptools import setup, Extension
-from configparser import ConfigParser
-
-# read the contents of your README file
-from os import path
-this_directory = path.abspath(path.dirname(__file__))
-with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
+with open('./README.md', encoding='utf-8') as f:
     long_description = f.read()
 
-define_macros= []
-
-# read settings from site.cfg
-c= ConfigParser()
-c.read(['site.cfg'])
-options= dict(c.items('cc_options'))
-
-if os.name == "posix":
-    from mariadb_posix import get_config
-if os.name == "nt":
-    from mariadb_windows import get_config
-
-cfg = get_config(options)
-
-PY_MARIADB_AUTHORS= "Georg Richter"
-
-PY_MARIADB_MAJOR_VERSION=1
-PY_MARIADB_MINOR_VERSION=0
-PY_MARIADB_PATCH_VERSION=9
-# PY_MARIADB_PRE_RELEASE_SEGMENT=""
-
-PY_MARIADB_VERSION= "%s.%s.%s" % (PY_MARIADB_MAJOR_VERSION, PY_MARIADB_MINOR_VERSION, PY_MARIADB_PATCH_VERSION)
-
-# Since we increase patch version even for alpha/beta/rc, pre release nr will be always zero.
-PY_MARIADB_PRE_RELEASE_NR=0
-
-define_macros.append(("PY_MARIADB_MAJOR_VERSION", PY_MARIADB_MAJOR_VERSION))
-define_macros.append(("PY_MARIADB_MINOR_VERSION", PY_MARIADB_MINOR_VERSION))
-define_macros.append(("PY_MARIADB_PATCH_VERSION", PY_MARIADB_PATCH_VERSION))
-# define_macros.append(("PY_MARIADB_PRE_RELEASE_SEGMENT", PY_MARIADB_PRE_RELEASE_SEGMENT))
-
 setup(name='mariadb',
-      version=PY_MARIADB_VERSION,
+      version="2.0.0",
       python_requires='>=3.6',
       classifiers = [
           'Development Status :: 5 - Production/Stable',
@@ -69,7 +31,7 @@ setup(name='mariadb',
       description='Python MariaDB extension',
       long_description=long_description,
       long_description_content_type='text/markdown',
-      author=PY_MARIADB_AUTHORS,
+      author='Georg Richter,Diego Dupin',
       license='LGPL 2.1',
       url='https://www.github.com/mariadb-corporation/mariadb-connector-python',
       project_urls={
@@ -77,20 +39,5 @@ setup(name='mariadb',
          "Documentation": "https://mariadb-corporation.github.io/mariadb-connector-python/",
          "Source Code": "https://www.github.com/mariadb-corporation/mariadb-connector-python",
       },
-      ext_modules=[Extension('mariadb._mariadb', ['mariadb/mariadb.c', 'mariadb/mariadb_connection.c',
-                                         'mariadb/mariadb_exception.c', 'mariadb/mariadb_cursor.c',
-                                         'mariadb/mariadb_codecs.c', 'mariadb/mariadb_field.c',
-                                         'mariadb/mariadb_parser.c',
-                                         'mariadb/mariadb_pooling.c',
-                                         'mariadb/mariadb_dbapitype.c', 'mariadb/mariadb_indicator.c'],
-                             define_macros= define_macros,
-                             include_dirs=cfg.includes,
-                             library_dirs=cfg.lib_dirs,
-                             libraries=cfg.libs,
-                             extra_compile_args = cfg.extra_compile_args,
-                             extra_link_args = cfg.extra_link_args,
-                             extra_objects= cfg.extra_objects
-                             )],
-      py_modules=['mariadb.__init__', 'mariadb.constants.CLIENT', 'mariadb.constants.INDICATOR', 'mariadb.constants.CURSOR',
-                   'mariadb.constants.FIELD_TYPE'],
-      )
+      packages=find_packages(exclude=["tests*"])
+)

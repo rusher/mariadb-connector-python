@@ -3,8 +3,11 @@
 
 # requirement: pip install pyperf
 
-import importlib 
+import importlib
 
+import pymysql
+
+import mariadb
 from benchmarks.internal_bench import test_suite
 from benchmarks.internal_bench import run_test
 from test.conf_test import conf, glob
@@ -16,7 +19,7 @@ dbdrv = importlib.import_module(module["module"])
 
 def main():
     default_conf = conf()
-    conn = dbdrv.connect(**default_conf)
+    conn = mariadb.connect(**default_conf)
     run_test(test_suite(), conn)
     conn.close()
 

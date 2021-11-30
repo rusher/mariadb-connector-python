@@ -1,15 +1,29 @@
 #!/usr/bin/env python -O
 # -*- coding: utf-8 -*-
-
+import logging
 import os
 import unittest
 
+import pymysql
+
 import mariadb
 
-from test.base_test import create_connection, is_skysql
-from test.conf_test import conf
+# from test.base_test import create_connection, is_skysql
+# from test.conf_test import conf
 import platform
 
+from testing.test.base_test import create_connection
+from testing.test.conf_test import conf
+
+request = "SELECT "
+
+for i in range(0, 10):
+    if i == 0:
+        request += " REPEAT('a', 100)"
+    else:
+        request += ", REPEAT('a', 100)"
+
+request += " from seq_1_to_10000 where 1 = ?"
 
 class TestConnection(unittest.TestCase):
 
@@ -185,14 +199,28 @@ class TestConnection(unittest.TestCase):
 
     def test_conpy101(self):
         default_conf = conf()
-        c1 = mariadb.connect(**default_conf)
-        self.assertEqual(c1.autocommit, False)
-        c1 = mariadb.connect(**default_conf, autocommit=True)
-        self.assertEqual(c1.autocommit, True)
+        conn = mariadb.connect(**default_conf)
+
+        cursor=conn.cursor()
+
+        for value in range(1):
+            cursor.execute(request, (1,))
+            row = cursor.fetchall()
+        del cursor
+        del conn
 
     def test_conpy155(self):
         default_conf= conf()
         c1 = mariadb.connect(**default_conf)
+        cursor = c1.cursor()
+        for value in range(10):
+            cursor.execute('select col1,col2,col3 from str_test where 1 = ?', (1,))
+        row= cursor.fetchone()
+        while row is not None:
+            row= cursor.fetchone()
+        del cursor
+
+
         version= c1.get_server_version()
         self.assertEqual(c1.get_server_version(), version)
         self.assertEqual(c1.get_server_version(), version)
