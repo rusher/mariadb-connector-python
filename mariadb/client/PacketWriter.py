@@ -61,20 +61,20 @@ class PacketWriter:
             b = bytearray(2)
             b[0] = value & 0xFF
             b[1] = value >> 8
-            self.write_bytes(b, 0, 2)
+            self.write_bytes(b, 2)
             return
         self.buf[self.pos] = value & 0xFF
         self.buf[self.pos + 1] = value >> 8
         self.pos += 2
 
     def write_int(self, value):
-        self.write_bytes(INT_PARSER.pack(value), 0, 4)
+        self.write_bytes(INT_PARSER.pack(value), 4)
 
     def write_long(self, value):
-        self.write_bytes(LONG_PARSER.pack(value), 0, 8)
+        self.write_bytes(LONG_PARSER.pack(value), 8)
 
     def write_double(self, value):
-        self.write_bytes(DOUBLE_PARSER.pack(value), 0, 8)
+        self.write_bytes(DOUBLE_PARSER.pack(value), 8)
 
     def write_float(self, value):
         self.write_bytes(struct.pack("<f", value), 0, 4)
@@ -82,7 +82,7 @@ class PacketWriter:
     def write_bytes_at_pos(self, b, pos):
         self.buf[pos:pos + len(b)] = b
 
-    def write_bytes(self, b, off, length):
+    def write_bytes(self, b, length):
         if length > len(self.buf) - self.pos:
             if len(self.buf) != self.max_packet_length:
                 self.grow_buffer(length)
@@ -96,6 +96,7 @@ class PacketWriter:
                 # not enough space in buf, will stream :
                 # fill buf and flush until all data are snd
                 remaining_len = length
+                off = 0
                 while True:
                     len_to_fill_buf = min(self.max_packet_length - self.pos, remaining_len)
                     self.buf[self.pos:self.pos + len_to_fill_buf] = [copy.deepcopy(x) for x in
@@ -108,7 +109,7 @@ class PacketWriter:
                     else:
                         break
                 return
-        self.buf[self.pos:(self.pos + length)] = b[off:(off + length)]
+        self.buf[self.pos:(self.pos + length)] = b
         self.pos += length
 
     def write_length(self, length) -> None:
@@ -122,7 +123,7 @@ class PacketWriter:
                 b[0] = 0xfc
                 b[1] = length & 0xFF
                 b[2] = length >> 8
-                self.write_bytes(b, 0, 3)
+                self.write_bytes(b, 3)
                 return
             self.buf[self.pos] = 0xfc
             self.buf[self.pos + 1] = length & 0xFF
@@ -137,7 +138,7 @@ class PacketWriter:
                 b[1] = length & 0xFF
                 b[2] = length >> 8
                 b[3] = length >> 16
-                self.write_bytes(b, 0, 4)
+                self.write_bytes(b, 4)
                 return
             self.buf[self.pos] = 0xfd
             self.buf[self.pos + 1] = length & 0xFF
@@ -158,7 +159,7 @@ class PacketWriter:
             b[6] = length >> 40
             b[7] = length >> 48
             b[8] = length >> 56
-            self.write_bytes(b, 0, 9)
+            self.write_bytes(b, 9)
             return
         self.buf[self.pos] = 0xfe
         self.buf[self.pos + 1] = length & 0xFF
@@ -173,11 +174,11 @@ class PacketWriter:
 
     def write_ascii(self, val):
         b = val.encode('ascii')
-        self.write_bytes(b, 0, len(b))
+        self.write_bytes(b, len(b))
 
     def write_string(self, val):
         b = val.encode()
-        self.write_bytes(b, 0, len(b))
+        self.write_bytes(b, len(b))
 
     def write_string_escaped(self, val, no_backslash_escapes):
         b = val.encode()
@@ -351,19 +352,20 @@ class PacketWriter:
         return None
 
     def init_packet(self):
-        self.sequence.value = 0xff
-        self.compress_sequence.value = 0xff
+        self.sequence.value = -1
+        self.compress_sequence.value = -1
         self.pos = 4
         self.cmd_length = 0
 
     def write_socket(self, command_end):
-        if self.pos > 4:
-            self.buf[0] = (self.pos - 4) % 256
-            self.buf[1] = (self.pos - 4) >> 8
-            self.buf[2] = (self.pos - 4) >> 16
-            self.buf[3] = self.sequence.increment_and_get() % 256
+        length = self.pos - 4
+        if length > 0:
+            self.buf[0] = length & 0xff
+            self.buf[1] = (length >> 8) & 0xff
+            self.buf[2] = (length >> 16) & 0xff
+            self.buf[3] = self.sequence.increment_and_get() & 0xff
 
-            self.check_max_allowed_length(self.pos - 4)
+            self.check_max_allowed_length(length)
 
             if PacketWriter.logger.isEnabledFor(logging.DEBUG):
                 if self.permit_trace:
@@ -371,10 +373,9 @@ class PacketWriter:
                     PacketWriter.logger.debug("send: " + self.server_thread_log + "\n" + trace)
                 else:
                     PacketWriter.logger.debug(
-                        "send: content length={} {} com=<hidden>".format(str(self.pos - 4), self.server_thread_log))
-            view = memoryview(self.buf)
-            self.socket.sendall(view[0:self.pos])
-            self.cmd_length += self.pos - 4
+                        "send: content length={} {} com=<hidden>".format(str(length), self.server_thread_log))
+            self.socket.sendall(self.buf[0:self.pos])
+            self.cmd_length += length
 
             # if last com fill the max size, must send an empty com to indicate command end.
             if command_end and self.pos == self.max_packet_length:

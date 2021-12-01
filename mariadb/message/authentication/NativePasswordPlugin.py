@@ -44,6 +44,6 @@ class NativePasswordPlugin(AuthenticationPlugin):
         else:
             truncated_seed = self.info['seed'][0: len(self.info['seed']) - 1]
             b = self.encrypt_password(self.info['password'], truncated_seed)
-            writer.write_bytes(b, 0, len(b))
+            writer.write_bytes(b, len(b))
             writer.flush()
         return reader.read_packet()

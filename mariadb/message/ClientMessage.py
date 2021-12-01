@@ -47,12 +47,12 @@ class ClientMessage:
             raise exception_factory.with_sql(self.description()).create(error_packet.message, error_packet.sql_state,
                                                                         error_packet.error_code)
         elif header == 0xfb:
-            buf.skip(1)
+            buf.skip_one()
             file_name = buf.read_string_null_end()
             try:
                 with open(file_name, 'rb') as f:
                     contents = f.read()
-                    writer.write_bytes(contents, 0, len(contents))
+                    writer.write_bytes(contents, len(contents))
                 writer.flush()
 
                 writer.write_empty_packet()

@@ -203,9 +203,9 @@ class TestConnection(unittest.TestCase):
 
         cursor=conn.cursor()
 
-        for value in range(100):
-            cursor.execute('select col1,col2,col3 from str_test')
-            row= cursor.fetchall()
+        for value in range(10000):
+            cursor.execute("select ?", (1,))
+            row = cursor.fetchall()
             del row
         del cursor
         del conn

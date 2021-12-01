@@ -5,6 +5,8 @@ from mariadb.message.server.PrepareResultPacket import PrepareResultPacket
 
 class CachedPrepareResultPacket(PrepareResultPacket):
 
+    __slots__ = ('closing', 'cached')
+
     def __init__(self, buffer: ReadableByteBuf, reader: PacketReader, context, client):
         super(CachedPrepareResultPacket, self).__init__(buffer, reader, context, client)
         self.closing = False

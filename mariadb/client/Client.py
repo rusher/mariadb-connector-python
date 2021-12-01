@@ -119,7 +119,7 @@ class Client:
                 # OK_Packet -> Authenticated !
                 # see https://mariadb.com/kb/en/library/ok_packet/
                 # *************************************************************************************
-                buf.skip()
+                buf.skip_one()
                 buf.skip(buf.read_length_not_null())
                 buf.skip(buf.read_length_not_null())
                 # insertId

@@ -15,7 +15,8 @@ class OkPacket:
         self.affected_rows = buf.read_length_not_null()
         self.last_insert_id = buf.read_length_not_null()
         context.server_status = buf.read_unsigned_short()
-        context.warning = buf.read_unsigned_short()
+        # warning
+        buf.skip(2)
 
         if (context.server_capabilities & Capabilities.CLIENT_SESSION_TRACK) != 0 and buf.readable_bytes() > 0:
             buf.skip(buf.read_length_not_null())  # skip info

@@ -49,7 +49,7 @@ class BulkExecutePacket(ClientMessage):
                 if writer.throw_max_allowed_length(last_cmd_data.length):
                     raise MaxAllowedPacketException("query size is >= to max_allowed_packet")
 
-                writer.write_bytes(last_cmd_data, 0, len(last_cmd_data))
+                writer.write_bytes(last_cmd_data, len(last_cmd_data))
                 writer.mark()
                 last_cmd_data = None
                 if not param_iterator:

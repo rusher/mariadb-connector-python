@@ -6,6 +6,7 @@ from mariadb.client.PacketWriter import PacketWriter
 from mariadb.message.ClientMessage import ClientMessage
 from mariadb.message.client.LongDataPacket import LongDataPacket
 
+NO_CURSOR_AND_ITERATION = b'\x00\x01\x00\x00\x00'
 
 class ExecutePacket(ClientMessage):
     __slots__ = ('statement_id', 'parameters', 'sql')
@@ -27,8 +28,7 @@ class ExecutePacket(ClientMessage):
         writer.init_packet()
         writer.write_byte(0x17)
         writer.write_int(self.statement_id)
-        writer.write_byte(0x00)  # NO CURSOR
-        writer.write_int(1)  # Iteration pos
+        writer.write_bytes(NO_CURSOR_AND_ITERATION, 5)  # NO CURSOR and 1 as Iteration pos
 
         if parameter_count > 0:
             # create null bitmap and reserve place in writer
@@ -43,7 +43,7 @@ class ExecutePacket(ClientMessage):
             # Store types of parameters in first package that is sent to the server.
             for i, p in enumerate(self.parameters):
                 if p is None:
-                    null_bits_buffer[i / 8] |= (1 << (i % 8))
+                    null_bits_buffer[int(i / 8)] |= (1 << (i % 8))
                 else:
                     writer.write_byte(param_datatype(p).value)
                     writer.write_byte(0)
@@ -75,7 +75,7 @@ def write_param(writer: PacketWriter, param) -> None:
     elif type(param) is str:
         b = param.encode('utf-8')
         writer.write_length(len(b))
-        writer.write_bytes(b, 0, len(b))
+        writer.write_bytes(b, len(b))
     elif type(param) is int:
         if -2147483648 < param < +2147483647:
             writer.write_int(param)
@@ -84,7 +84,7 @@ def write_param(writer: PacketWriter, param) -> None:
     elif type(param) is float:
         b = str(param).encode('ascii')
         writer.write_length(len(b))
-        writer.write_bytes(b, 0, len(b))
+        writer.write_bytes(b, len(b))
 
     elif type(param) is datetime:
         if param.microsecond == 0:
@@ -128,7 +128,7 @@ def write_param(writer: PacketWriter, param) -> None:
             writer.write_int(param.microsecond)
     elif type(param) is bytes or type(param) is bytearray or type(param) is memoryview:
         writer.write_length(len(param))
-        writer.write_bytes(param, 0, len(param))
+        writer.write_bytes(param, len(param))
     else:
         raise Exception('type ' + type(param) + ' is not supported')
 

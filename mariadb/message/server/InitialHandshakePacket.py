@@ -27,7 +27,7 @@ class InitialHandshakePacket:
         thread_id = reader.read_int()
         seed1 = bytearray(8)
         reader.read_bytes(seed1)
-        reader.skip()
+        reader.skip_one()
         server_capabilities_two_first_bytes = reader.read_unsigned_short()
 
         default_collation = reader.read_unsigned_byte()
@@ -38,7 +38,7 @@ class InitialHandshakePacket:
         if (server_capabilities_four_first_bytes & Capabilities.PLUGIN_AUTH) != 0:
             salt_length = max(12, reader.read_byte() - 9)
         else:
-            reader.skip()
+            reader.skip_one()
 
         reader.skip(6)
 
@@ -58,7 +58,7 @@ class InitialHandshakePacket:
         else:
             seed = seed1
 
-        reader.skip()
+        reader.skip_one()
 
         # check for MariaDB 10.x replication hack , remove fake prefix if needed
         #  (see comments about MARIADB_RPL_HACK_PREFIX)

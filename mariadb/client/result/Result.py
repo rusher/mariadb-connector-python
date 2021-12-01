@@ -9,14 +9,15 @@ from mariadb.util.constant import ServerStatus
 class Result:
     __slots__ = ('closed', 'loaded', 'output_parameter', 'reader', 'exception_factory', 'context', 'cols', 'binary', 'meta_len', 'parser', 'res', 'parse_fcts')
     def __init__(self, binary_protocol: bool, metadata_list, reader: PacketReader, context: Context):
-        self.closed = False
-        self.loaded = False
-        self.output_parameter = False
         self.reader = reader
         self.exception_factory = context.exception_factory
         self.context = context
         self.cols = metadata_list
         self.binary = binary_protocol
+        self.closed = False
+        self.loaded = False
+        self.output_parameter = False
+
         self.meta_len = len(metadata_list)
         self.parser = self.decode_binary if binary_protocol else self.decode_text
         self.res = [None] * self.meta_len
@@ -37,22 +38,21 @@ class Result:
             raise self.exception_factory.create(error_packet.message, error_packet.sql_state, error_packet.error_code)
         elif header == 0xFE and ((self.context.eof_deprecated and buf.readable_bytes() < 16777215) or (
                     not self.context.eof_deprecated and buf.readable_bytes() < 8)):
-            # skip header
-            buf.skip()
             if not self.context.eof_deprecated:
                 # EOF_Packet
-                warnings = buf.read_unsigned_short()
+                # skip header + warning
+                buf.skip(3)
                 server_status = buf.read_unsigned_short()
             else:
                 # OK_Packet with a 0xFE header
+                # skip header
+                buf.skip_one()
                 buf.skip(buf.read_length_not_null())  # skip update count
                 buf.skip(buf.read_length_not_null())  # skip insert id
                 server_status = buf.read_unsigned_short()
-                warnings = buf.read_unsigned_short()
 
             self.output_parameter = (server_status & ServerStatus.PS_OUT_PARAMETERS) != 0
             self.context.server_status = server_status
-            self.context.warning = warnings
             self.loaded = True
             self.res = None
             return None
@@ -87,22 +87,20 @@ class Result:
                 if (self.context.eof_deprecated and len(buf) < 16777215) or (
                         not self.context.eof_deprecated and len(buf) < 8):
                     read_buf = ReadableByteBuf(None, buf, 0, buf.length)
-                    read_buf.skip()  # skip header
 
                     if not self.context.eof_deprecated:
                         # EOF_Packet
-                        warnings = read_buf.read_unsigned_short()
+                        read_buf.skip(3)  # skip header + warning
                         server_status = read_buf.read_unsigned_short()
                     else:
                         # OK_Packet with a 0xFE header
+                        read_buf.skip_one()  # skip header
                         read_buf.skip(read_buf.read_length_not_null())  # skip update count
                         read_buf.skip(read_buf.read_length_not_null())  # skip insert id
                         server_status = read_buf.read_unsigned_short()
-                        warnings = read_buf.read_unsigned_short()
 
                     self.output_parameter = (server_status & ServerStatus.PS_OUT_PARAMETERS) != 0
                     self.context.server_status = server_status
-                    self.context.warning = warnings
                     self.loaded = True
                     return False
 

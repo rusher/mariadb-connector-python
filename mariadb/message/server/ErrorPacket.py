@@ -9,11 +9,11 @@ class ErrorPacket:
     logger = logging.getLogger(__name__)
 
     def __init__(self, buf: ReadableByteBuf, context: Context):
-        buf.skip()
+        buf.skip_one()
         self.error_code = buf.read_short()
         next = buf.get_byte(buf.pos)
         if next == '#':
-            buf.skip()
+            buf.skip_one()
             self.sql_state = buf.read_ascii(5)
             self.message = buf.read_string_eof()
         else:

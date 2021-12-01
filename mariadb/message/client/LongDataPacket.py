@@ -14,6 +14,6 @@ class LongDataPacket(ClientMessage):
         writer.write_byte(0x18)
         writer.write_int(self.statement_id)
         writer.write_short(self.index)
-        writer.write_bytes(self.parameter, 0, len(self.parameter))
+        writer.write_bytes(self.parameter, len(self.parameter))
         writer.flush()
         return 0

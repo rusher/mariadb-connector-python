@@ -74,9 +74,6 @@ class Connection:
     def context(self) -> Context:
         return self.__client.context
 
-    def clear_warnings(self) -> None:
-        self.__client.context.warning = 0
-
     def check_not_closed(self) -> None:
         if self.__client.closed:
             raise self.__client.exception_factory.create("Connection is closed", "08000", 1220)

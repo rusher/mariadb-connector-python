@@ -16,12 +16,12 @@ _PYTHON_VERSION = "_python_version"
 def write_string_length(encoder: PacketWriter, value: str):
     val_bytes = value.encode('utf-8')
     encoder.write_length(len(val_bytes))
-    encoder.write_bytes(val_bytes, 0, len(val_bytes))
+    encoder.write_bytes(val_bytes, len(val_bytes))
 
 
 def write_string_length_ascii(encoder: PacketWriter, value: str):
     ascii_val = value.encode('ascii')
-    encoder.write_bytes(ascii_val, 0, len(ascii_val))
+    encoder.write_bytes(ascii_val, len(ascii_val))
 
 
 def write_connect_attributes(writer: PacketWriter, connection_attributes: str, host: str):
@@ -59,7 +59,7 @@ def write_connect_attributes(writer: PacketWriter, connection_attributes: str, h
     length = ending - (writer.pos + 4)
 
     writer.write_byte(0xfd)
-    writer.write_bytes(length.to_bytes(3, byteorder='little', signed=False), 0, 3)
+    writer.write_bytes(length.to_bytes(3, byteorder='little', signed=False), 3)
     writer.pos = ending
 
 
@@ -91,7 +91,7 @@ class HandshakeResponse:
         writer.write_int(self.client_capabilities % (1 << 32))
         writer.write_int(1024 * 1024 * 1024)
         writer.write_byte(self.exchange_charset)
-        writer.write_bytes(bytearray([0x00] * 19), 0, 19)
+        writer.write_bytes(bytearray([0x00] * 19), 19)
         # Maria extended flag
         writer.write_int(self.client_capabilities >> 32)
         writer.write_string(self.user if self.user is not None else getpass.getuser())
@@ -99,12 +99,12 @@ class HandshakeResponse:
 
         if (context.server_capabilities & Capabilities.PLUGIN_AUTH_LENENC_CLIENT_DATA) != 0:
             writer.write_length(len(auth_data))
-            writer.write_bytes(auth_data, 0, len(auth_data))
+            writer.write_bytes(auth_data, len(auth_data))
         elif (context.server_capabilities & Capabilities.SECURE_CONNECTION) != 0:
             writer.write_byte(len(auth_data))
-            writer.write_bytes(auth_data, 0, len(auth_data))
+            writer.write_bytes(auth_data, len(auth_data))
         else:
-            writer.write_bytes(auth_data, 0, len(auth_data))
+            writer.write_bytes(auth_data, len(auth_data))
             writer.write_byte(0x00)
 
         if (self.client_capabilities & Capabilities.CONNECT_WITH_DB) != 0:

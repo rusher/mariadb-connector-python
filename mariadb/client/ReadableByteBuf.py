@@ -9,7 +9,6 @@ LONG_UNSIGNED_PARSER = struct.Struct('<Q')
 
 
 class ReadableByteBuf:
-
     __slots__ = ('sequence', 'pos', 'buf', 'limit', 'view')
 
     def __init__(self, sequence, buf, pos, limit):
@@ -140,7 +139,6 @@ class ReadableByteBuf:
         self.pos += length
         return str(self.view[self.pos - length: self.pos], 'utf-8').split(',')
 
-
     def skip_identifier(self) -> int:
         length = self.buf[self.pos] & 0xff
         if length == 252:
@@ -237,14 +235,13 @@ class ReadableByteBuf:
         self.read_bytes(tmp)
         return ReadableByteBuf(self.sequence, tmp, 0, length)
 
-
     def read_string(self, length):
         self.pos += length
         return str(self.view[self.pos - length: self.pos], 'utf-8')
 
     def read_ascii(self, length):
         self.pos += length
-        return str(self.view[self.pos - length: self.pos],'ascii')
+        return str(self.view[self.pos - length: self.pos], 'ascii')
 
     def read_string_null_end(self):
         cnt = 0
@@ -300,7 +297,7 @@ class ReadableByteBuf:
         length = self.read_length()
         if length == 0:
             return None
-        self.skip(3) # negate + days
+        self.pos += 3  # negate + days
         hour = self.read_byte()
         minutes = self.read_byte()
         seconds = self.read_byte()

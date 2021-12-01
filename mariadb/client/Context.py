@@ -7,7 +7,7 @@ class Context:
 
     __slots__ = (
         'thread_id', 'seed', 'server_capabilities', 'server_status', 'version', 'eof_deprecated', 'skip_meta', 'extended_info',
-        'conf', 'state_flag', 'database', 'exception_factory', 'warning', 'transaction_isolation_level', 'prepare_cache')
+        'conf', 'state_flag', 'database', 'exception_factory', 'transaction_isolation_level', 'prepare_cache')
     
     def __init__(self, handshake: InitialHandshakePacket, client_capabilities: int, conf,
                  exception_factory: ExceptionFactory, prepare_cache):
@@ -23,7 +23,6 @@ class Context:
         self.state_flag = 0
         self.database = conf.get('database')
         self.exception_factory = exception_factory
-        self.warning = 0
         self.transaction_isolation_level = None
         self.prepare_cache = prepare_cache
         # self.prepare_cache = prepare_cache

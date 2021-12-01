@@ -221,16 +221,17 @@ class Cursor:
     def __execute_binary_stmt_with_param(self, sql: str, parameters) -> None:
         self.check_not_closed()
         no_backslash_escapes = (self.__client.context.server_status & ServerStatus.NO_BACKSLASH_ESCAPES) > 0
-        parser = parameter_parts(sql, no_backslash_escapes)
+
         self.__lock.acquire()
         try:
             params = parameters
             if type(parameters) != tuple:
                 params = tuple(parameters)
-            if len(params) < parser.param_count:
-                raise Exception('some parameters are not set')
             self.prepare = self.__client.context.prepare_cache.get(sql)
             if self.prepare:
+                if len(params) < self.prepare.num_params:
+                    raise Exception('some parameters are not set')
+
                 self.__results = self.__client.execute(ExecutePacket(self.prepare.statement_id, params, sql), self,
                                                        self.__arraysize)
             elif (self.__client.context.server_capabilities & Capabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS) > 0:

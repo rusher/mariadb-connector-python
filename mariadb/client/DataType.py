@@ -3,7 +3,7 @@ from enum import Enum
 from mariadb.client import DataTypeMap
 
 
-class DataType(bytes, Enum):
+class DataType(Enum):
     OLDDECIMAL = 0
     TINYINT = 1
     SMALLINT = 2
