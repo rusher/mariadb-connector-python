@@ -1,15 +1,17 @@
 import json
+import struct
 
 from mariadb.client import DataTypeMap
 from mariadb.client.DataType import DataType
 from mariadb.client.ReadableByteBuf import ReadableByteBuf
 from mariadb.util.constant import ColumnFlags
 
+INT_PARSER = struct.Struct('<i')
 
 class Column:
     __slots__ = ('data_type', 'saved', 'charset', 'length', 'decimals', 'flags', 'ext_type_name')
 
-    def __init__(self, saved: ReadableByteBuf, length: int, data_type: DataType, charset: int,
+    def __init__(self, saved: bytearray, length: int, data_type: DataType, charset: int,
                  decimals: int, flags: int, ext_type_name: str):
         self.data_type = data_type
         self.saved = saved
@@ -22,8 +24,8 @@ class Column:
     @staticmethod
     def decode(buf: ReadableByteBuf, extended_info: bool):
 
-        saved = buf.readablebuffer()
-        saved.pos = saved.limit - 12
+        saved = buf.save_buf()
+        pos = len(saved) - 12
 
         ext_type_name = None
         # if extended_info:
@@ -40,11 +42,11 @@ class Column:
         #                 sub_packet.skip(sub_packet.read_length())
 
         # buf.skip()  # skip length always 0x0c
-        charset = saved.read_short()
-        length = saved.read_int()
-        data_type = DataTypeMap.type_map[saved.read_unsigned_byte()]
-        flags = saved.read_unsigned_short()
-        decimals = saved.read_byte()
+        charset = ((saved[pos] & 0xff) + ((saved[pos + 1] & 0xff) << 8))
+        length, = INT_PARSER.unpack_from(saved, pos + 2)
+        data_type = DataTypeMap.type_map[saved[pos + 6]]
+        flags = (saved[pos + 7] & 0xff + (saved[pos + 8] & 0xff) << 8)
+        decimals = saved[pos + 9]
 
         # str_buf = buf.buf[0:string_pos[4]]
         return Column(saved, length, data_type, charset, decimals, flags, ext_type_name)
@@ -91,7 +93,7 @@ class Column:
             if self.data_type == DataType.SMALLINT or self.data_type == DataType.YEAR:
                 return "read_short" if self.is_signed() else "read_unsigned_short"
             if self.data_type == DataType.INTEGER or self.data_type == DataType.MEDIUMINT:
-                return "buf.read_int" if self.is_signed() else "read_unsigned_int"
+                return "read_int" if self.is_signed() else "read_unsigned_int"
             if self.data_type == DataType.BIGINT:
                 return "read_long" if self.is_signed() else "read_unsigned_long"
             if self.data_type == DataType.FLOAT:

@@ -249,8 +249,8 @@ class ReadableByteBuf:
         self.pos += length
         return self.view[self.pos - length: self.pos]
 
-    def readablebuffer(self):
-        return ReadableByteBuf(self.sequence, self.buf[self.pos: self.limit], 0, self.limit - self.pos)
+    def save_buf(self):
+        return self.buf[self.pos: self.limit]
 
     def read_length_buffer(self):
         length = self.read_length_not_null()
