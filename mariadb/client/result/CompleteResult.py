@@ -9,11 +9,16 @@ class CompleteResult(Result):
 
     def __init__(self, binary_protocol: bool, metadata_list: list, reader: PacketReader, context: Context):
         super(CompleteResult, self).__init__(binary_protocol, metadata_list, reader, context)
+
         res = []
-        tup = super().read_next()
+        next = super().read_next
+        append = res.append
+
+        tup = next()
         while tup is not None:
-            res.append(tup)
-            tup = super().read_next()
+            append(tup)
+            tup = next()
+
         self.data = tuple(res)
         self.data_len = len(self.data)
         self.pos = 0

@@ -1,17 +1,14 @@
 from threading import RLock
-from functools import partial
 from mariadb.client.Context import Context
-from mariadb.client.DataType import DataType
 from mariadb.client.PacketReader import PacketReader
 from mariadb.client.ReadableByteBuf import ReadableByteBuf
-from mariadb.message.server.Column import Column
 from mariadb.message.server.ErrorPacket import ErrorPacket
 from mariadb.util.constant import ServerStatus
 
 
 class Result:
     __slots__ = ('closed', 'loaded', 'output_parameter', 'reader', 'exception_factory', 'context', 'cols', 'binary', 'meta_len', 'parser', 'res', 'parse_fcts')
-    def __init__(self, binary_protocol: bool, metadata_list: list[Column], reader: PacketReader, context: Context):
+    def __init__(self, binary_protocol: bool, metadata_list, reader: PacketReader, context: Context):
         self.closed = False
         self.loaded = False
         self.output_parameter = False
@@ -24,19 +21,9 @@ class Result:
         self.parser = self.decode_binary if binary_protocol else self.decode_text
         self.res = [None] * self.meta_len
         self.parse_fcts = [None] * self.meta_len
-        if binary_protocol:
-            self.parser = self.decode_binary
-            for i, col in enumerate(self.cols):
-                self.parse_fcts[i] = col.data_type.parse_binary
-                if col.data_type == DataType.VARSTRING and col.ext_type_name == 'json':
-                    self.parse_fcts[i] = DataType.read_json_text
+        for i, col in enumerate(self.cols):
+            self.parse_fcts[i] = col.parser(binary_protocol)
 
-        else:
-            self.parser = self.decode_text
-            for i, col in enumerate(self.cols):
-                self.parse_fcts[i] = col.data_type.parse_text
-                if col.data_type == DataType.VARSTRING and col.ext_type_name == 'json':
-                    self.parse_fcts[i] = DataType.read_json_text
 
 
 
@@ -79,7 +66,7 @@ class Result:
             if (null_bitmap[int((i + 2) / 8)] & (1 << ((i + 2) % 8))) > 0:
                 self.res[i] = None
             else:
-                self.res[i] = parse_fct(buf, self.cols[i])
+                self.res[i] = parse_fct(buf)
         return tuple(self.res)
 
     def decode_text(self, buf: ReadableByteBuf) -> tuple:

@@ -12,7 +12,7 @@ class LexState(Enum):
 
 class ClientParser:
 
-    def __init__(self, sql: str, query_parts: list[bytes]):
+    def __init__(self, sql: str, query_parts):
         self.sql = sql
         self.query_parts = query_parts
         self.param_count = len(query_parts) - 1

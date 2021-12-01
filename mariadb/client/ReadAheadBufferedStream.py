@@ -50,7 +50,7 @@ class ReadAheadBufferedStream:
                         total_reads += read
                     return external_buf, 0, length
                 else:
-                    self.buf[0:self.end - self.pos] = self.view[self.pos:self.end]
+                    self.view[0:self.end - self.pos] = self.view[self.pos:self.end]
                     self.end = self.end - self.pos
                     self.pos = 0
                     chunk = self.view[self.end:BUFFER_SIZE]

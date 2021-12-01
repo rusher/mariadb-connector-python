@@ -14,14 +14,13 @@ for i in range(0, 10):
 request += " from seq_1_to_10000"
 
 
-def select_10_cols_from_seq_1_to_10000(loops, conn):
+def select_10_cols_from_seq_1_to_10000(loops, conn, paramstyle):
     cursor = conn.cursor()
     range_it = range(loops)
     t0 = pyperf.perf_counter()
     for value in range_it:
         cursor.execute(request)
         row = cursor.fetchall()
-        cursor.execute('do 1')
     cursor.close()
 
     return pyperf.perf_counter() - t0

@@ -13,13 +13,13 @@ from benchmarks.benchmark.select_10_cols_from_seq_1_to_10000 import \
 from benchmarks.benchmark.select_1_mysql_user import select_1_mysql_user
 from benchmarks.benchmark.bulk import bulk
 
-def run_test(tests, conn):
+def run_test(tests, conn, paramstyle):
     runner = pyperf.Runner()
     for test in tests:
-        runner.bench_time_func(test['label'], test['method'], conn)
+        runner.bench_time_func(test['label'], test['method'], conn, paramstyle)
 
 
-def test_suite():
+def test_suite(paramstyle):
     is_mysql= int(os.environ.get('TEST_MYSQL', '1'))
     ts= [
         {'label': 'str_fetchloop', 'method': str_fetchloop},

@@ -1,4 +1,4 @@
-import array
+import json
 
 from mariadb.client import DataTypeMap
 from mariadb.client.DataType import DataType
@@ -7,7 +7,6 @@ from mariadb.util.constant import ColumnFlags
 
 
 class Column:
-
     __slots__ = ('data_type', 'saved', 'charset', 'length', 'decimals', 'flags', 'ext_type_name')
 
     def __init__(self, saved: ReadableByteBuf, length: int, data_type: DataType, charset: int,
@@ -19,8 +18,6 @@ class Column:
         self.decimals = decimals
         self.flags = flags
         self.ext_type_name = ext_type_name
-
-
 
     @staticmethod
     def decode(buf: ReadableByteBuf, extended_info: bool):
@@ -42,7 +39,7 @@ class Column:
         #                 # skip data
         #                 sub_packet.skip(sub_packet.read_length())
 
-        #buf.skip()  # skip length always 0x0c
+        # buf.skip()  # skip length always 0x0c
         charset = saved.read_short()
         length = saved.read_int()
         data_type = DataTypeMap.type_map[saved.read_unsigned_byte()]
@@ -51,63 +48,6 @@ class Column:
 
         # str_buf = buf.buf[0:string_pos[4]]
         return Column(saved, length, data_type, charset, decimals, flags, ext_type_name)
-
-    # @staticmethod
-    # def create(name: str, data_type: DataType):
-    #     name_bytes = name.encode('utf-8')
-    #     arr = bytearray(9 + 2 * len(name_bytes))
-    #     arr[0] = 3
-    #     arr[1] = ord('D')
-    #     arr[2] = ord('E')
-    #     arr[3] = ord('F')
-    #
-    #     string_pos = array.array('i')
-    #     string_pos[0] = 4  # schema pos
-    #     string_pos[1] = 5  # table alias pos
-    #     string_pos[2] = 6  # table pos
-    #
-    #     # lenenc_str     name
-    #     # lenenc_str     org_name
-    #     pos = 7
-    #     for i in range(0, 2):
-    #         string_pos[i + 3] = pos
-    #         arr[pos] = len(name_bytes)
-    #         pos += 1
-    #         arr[pos:len(name_bytes)] = name_bytes
-    #         pos += len(name_bytes)
-    #
-    #     # Sensible predefined length - since we're dealing with I_S here, most char fields are 64 char long
-    #     if data_type == DataType.VARCHAR or data_type == DataType.VARSTRING:
-    #         length = 64 * 3  # 3 bytes per UTF8 char
-    #     elif data_type == DataType.SMALLINT:
-    #         length = 5
-    #     elif data_type == DataType.NULL:
-    #         length = 0
-    #     else:
-    #         length = 1
-    #
-    #     return Column(ReadableByteBuf(None, arr, len(arr)), length, data_type, tuple(string_pos), 33, 0,
-    #                   ColumnFlags.PRIMARY_KEY, None)
-
-    # def get_schema(self):
-    #     b = ReadableByteBuf(None, self.buf, self.string_pos[0], len(self.buf))
-    #     return b.read_string(b.read_length_not_null())
-    #
-    # def get_table_alias(self):
-    #     b = ReadableByteBuf(None, self.buf, self.string_pos[1], len(self.buf))
-    #     return b.read_string(b.read_length_not_null())
-    #
-    # def get_table(self):
-    #     b = ReadableByteBuf(None, self.buf, self.string_pos[2], len(self.buf))
-    #     return b.read_string(b.read_length_not_null())
-    #
-    # def get_column_alias(self):
-    #     b = ReadableByteBuf(None, self.buf, self.string_pos[3], len(self.buf))
-    #     return b.read_string(b.read_length_not_null())
-    #
-    # def get_column_name(self):
-    #     b = ReadableByteBuf(None, self.buf, self.string_pos[4], len(self.buf))
-    #     return b.read_string(b.read_length_not_null())
 
     def is_signed(self) -> bool:
         return (self.flags & ColumnFlags.UNSIGNED) == 0
@@ -143,3 +83,57 @@ class Column:
             return 0
         else:
             return self.length
+
+    def parser(self, binary: bool):
+        if binary:
+            if self.data_type == DataType.TINYINT:
+                if self.is_signed():
+                    return lambda buf: buf.read_byte()
+                else:
+                    return lambda buf: buf.read_unsigned_byte()
+            if self.data_type == DataType.SMALLINT or self.data_type == DataType.YEAR:
+                if self.is_signed():
+                    return lambda buf: buf.read_short()
+                else:
+                    return lambda buf: buf.read_unsigned_short()
+            if self.data_type == DataType.INTEGER or self.data_type == DataType.MEDIUMINT:
+                if self.is_signed():
+                    return lambda buf: buf.read_int()
+                else:
+                    return lambda buf: buf.read_unsigned_int()
+            if self.data_type == DataType.BIGINT:
+                if self.is_signed():
+                    return lambda buf: buf.read_long()
+                else:
+                    return lambda buf: buf.read_unsigned_long()
+            if self.data_type == DataType.FLOAT:
+                return lambda buf: buf.read_float()
+            if self.data_type == DataType.DOUBLE:
+                return lambda buf: buf.read_double()
+            if self.data_type == DataType.TIMESTAMP or self.data_type == DataType.TIMESTAMP:
+                return lambda buf: buf.read_datetime()
+            if self.data_type == DataType.DATE or self.data_type == DataType.NEWDATE:
+                return lambda buf: buf.read_date()
+            if self.data_type == DataType.TIME:
+                return lambda buf: buf.read_time()
+
+        else:
+            if self.data_type in (
+            DataType.TINYINT, DataType.SMALLINT, DataType.YEAR, DataType.MEDIUMINT, DataType.INTEGER, DataType.BIGINT):
+                return lambda buf: buf.read_int_length_encoded()
+            if self.data_type == DataType.TIMESTAMP or self.data_type == DataType.DATETIME:
+                return lambda buf: buf.read_datetime_length_encoded()
+            if self.data_type == DataType.DATE or self.data_type == DataType.NEWDATE:
+                return lambda buf: buf.read_date_length_encoded()
+            if self.data_type == DataType.TIME:
+                return lambda buf: buf.read_time_length_encoded()
+
+        if self.data_type == DataType.OLDDECIMAL or self.data_type == DataType.DECIMAL:
+            return lambda buf: buf.read_float_length_encoded()
+        if self.ext_type_name == 'json' or self.data_type == DataType.JSON:
+            return lambda buf: json.loads(buf.read_string_length_encoded())
+        if self.charset == 63:
+            return lambda buf: buf.read_length_buffer()
+        if self.flags & 2048 > 0:
+            return lambda buf: buf.read_set_length_encoded()
+        return lambda buf: buf.read_string_length_encoded()

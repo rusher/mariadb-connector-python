@@ -18,7 +18,7 @@ dbdrv = importlib.import_module(module[0])
 def main():
     default_conf = conf()
     conn = dbdrv.connect(**default_conf)
-    run_test(test_suite(), conn)
+    run_test(test_suite(dbdrv.paramstyle), conn, dbdrv.paramstyle)
     conn.close()
 
 if __name__ == "__main__":

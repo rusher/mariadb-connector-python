@@ -126,12 +126,20 @@ class ReadableByteBuf:
             return None
         return time.fromisoformat(val)
 
-    def read_string_length_encoded(self,):
+    def read_string_length_encoded(self):
         length = self.read_length()
         if length is None:
             return None
         self.pos += length
-        return str(self.view[self.pos - length: self.pos], 'utf8')
+        return str(self.view[self.pos - length: self.pos], 'utf-8')
+
+    def read_set_length_encoded(self):
+        length = self.read_length()
+        if length is None:
+            return None
+        self.pos += length
+        return str(self.view[self.pos - length: self.pos], 'utf-8').split(',')
+
 
     def skip_identifier(self) -> int:
         length = self.buf[self.pos] & 0xff
@@ -232,7 +240,7 @@ class ReadableByteBuf:
 
     def read_string(self, length):
         self.pos += length
-        return str(self.view[self.pos - length: self.pos], 'utf8')
+        return str(self.view[self.pos - length: self.pos], 'utf-8')
 
     def read_ascii(self, length):
         self.pos += length
@@ -242,12 +250,12 @@ class ReadableByteBuf:
         cnt = 0
         while self.readable_bytes() > cnt and self.buf[self.pos + cnt] != 0:
             cnt += 1
-        dst = str(self.view[self.pos: self.pos + cnt], 'utf8')
+        dst = str(self.view[self.pos: self.pos + cnt], 'utf-8')
         self.pos += cnt + 1
         return dst
 
     def read_string_eof(self):
-        dst = str(self.view[self.pos: self.limit], 'utf8')
+        dst = str(self.view[self.pos: self.limit], 'utf-8')
         self.pos = self.limit
         return dst
 
@@ -262,3 +270,41 @@ class ReadableByteBuf:
     def read_double_be(self):
         self.pos += 8
         return unpack(">d", self.buf[self.pos - 8: self.pos])[0]
+
+    def read_datetime(self):
+        length = self.read_length()
+        if length == 0:
+            return None
+        year = self.read_unsigned_short()
+        month = self.read_byte()
+        day_of_month = self.read_byte()
+        hour, minutes, seconds, microseconds = 0, 0, 0, 0
+        if length > 4:
+            hour = self.read_byte()
+            minutes = self.read_byte()
+            seconds = self.read_byte()
+            if length > 7:
+                microseconds = self.read_unsigned_int()
+        return datetime.datetime(year, month, day_of_month, hour, minutes, seconds, microseconds)
+
+    def read_date(self):
+        length = self.read_length()
+        if length == 0:
+            return None
+        year = self.read_unsigned_short()
+        month = self.read_byte()
+        day_of_month = self.read_byte()
+        return datetime.date(year, month, day_of_month)
+
+    def read_time(self):
+        length = self.read_length()
+        if length == 0:
+            return None
+        self.skip(3) # negate + days
+        hour = self.read_byte()
+        minutes = self.read_byte()
+        seconds = self.read_byte()
+        microseconds = 0
+        if length > 8:
+            microseconds = self.read_unsigned_int()
+        return datetime.time(hour, minutes, seconds, microseconds)
