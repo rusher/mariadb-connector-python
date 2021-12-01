@@ -114,6 +114,8 @@ class Column:
                 return lambda buf: buf.read_date_length_encoded()
             if self.data_type == DataType.TIME:
                 return lambda buf: buf.read_time_length_encoded()
+            if self.data_type == DataType.FLOAT or self.data_type == DataType.DOUBLE:
+                return lambda buf: buf.read_float_length_encoded()
 
         if self.data_type == DataType.OLDDECIMAL or self.data_type == DataType.DECIMAL:
             return lambda buf: buf.read_float_length_encoded()
