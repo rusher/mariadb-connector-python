@@ -12,6 +12,8 @@ class LexState(Enum):
 
 class ClientParser:
 
+    __slots__ = ('sql', 'query_parts', 'param_count')
+
     def __init__(self, sql: str, query_parts):
         self.sql = sql
         self.query_parts = query_parts

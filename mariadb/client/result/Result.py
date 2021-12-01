@@ -66,12 +66,12 @@ class Result:
             if (null_bitmap[int((i + 2) / 8)] & (1 << ((i + 2) % 8))) > 0:
                 self.res[i] = None
             else:
-                self.res[i] = parse_fct(buf)
+                self.res[i] = getattr(buf, parse_fct)()
         return tuple(self.res)
 
     def decode_text(self, buf: ReadableByteBuf) -> tuple:
         for i, parse_fct in enumerate(self.parse_fcts):
-            self.res[i] = parse_fct(buf)
+            self.res[i] = getattr(buf, parse_fct)()
         return tuple(self.res)
 
     def skip_remaining(self):

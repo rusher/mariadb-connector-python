@@ -132,7 +132,8 @@ class Client:
             # **********************************************************************
             # post queries
             # **********************************************************************
-            # TODO with skip_post_commands
+            # TODO if needed
+
         except Exception as err:
             self.destroy_socket()
             raise err
@@ -359,6 +360,5 @@ class Client:
             self.socket.settimeout(3)
             self.socket.close()
             self.writer.close()
-            self.reader.close()
         except Exception as e:
             pass

@@ -87,42 +87,42 @@ class Column:
     def parser(self, binary: bool):
         if binary:
             if self.data_type == DataType.TINYINT:
-                return lambda buf: buf.read_byte() if self.is_signed() else lambda b: b.read_unsigned_byte()
+                return "read_byte" if self.is_signed() else "read_unsigned_byte"
             if self.data_type == DataType.SMALLINT or self.data_type == DataType.YEAR:
-                return lambda buf: buf.read_short() if self.is_signed() else lambda b: b.read_unsigned_short()
+                return "read_short" if self.is_signed() else "read_unsigned_short"
             if self.data_type == DataType.INTEGER or self.data_type == DataType.MEDIUMINT:
-                return lambda buf: buf.read_int() if self.is_signed() else lambda b: b.read_unsigned_int()
+                return "buf.read_int" if self.is_signed() else "read_unsigned_int"
             if self.data_type == DataType.BIGINT:
-                return lambda buf: buf.read_long() if self.is_signed() else lambda b: b.read_unsigned_long()
+                return "read_long" if self.is_signed() else "read_unsigned_long"
             if self.data_type == DataType.FLOAT:
-                return lambda buf: buf.read_float()
+                return "read_float"
             if self.data_type == DataType.DOUBLE:
-                return lambda buf: buf.read_double()
+                return "read_double"
             if self.data_type == DataType.TIMESTAMP or self.data_type == DataType.TIMESTAMP:
-                return lambda buf: buf.read_datetime()
+                return "read_datetime"
             if self.data_type == DataType.DATE or self.data_type == DataType.NEWDATE:
-                return lambda buf: buf.read_date()
+                return "read_date"
             if self.data_type == DataType.TIME:
-                return lambda buf: buf.read_time()
+                return "read_time"
 
         else:
             if self.data_type == DataType.TINYINT or self.data_type == DataType.SMALLINT or self.data_type == DataType.YEAR or self.data_type == DataType.MEDIUMINT or self.data_type == DataType.INTEGER or self.data_type == DataType.BIGINT:
-                return lambda buf: buf.read_int_length_encoded()
+                return "read_int_length_encoded"
             if self.data_type == DataType.TIMESTAMP or self.data_type == DataType.DATETIME:
-                return lambda buf: buf.read_datetime_length_encoded()
+                return "read_datetime_length_encoded"
             if self.data_type == DataType.DATE or self.data_type == DataType.NEWDATE:
-                return lambda buf: buf.read_date_length_encoded()
+                return "read_date_length_encoded"
             if self.data_type == DataType.TIME:
-                return lambda buf: buf.read_time_length_encoded()
+                return "read_time_length_encoded"
             if self.data_type == DataType.FLOAT or self.data_type == DataType.DOUBLE:
-                return lambda buf: buf.read_float_length_encoded()
+                return "read_float_length_encoded"
 
         if self.data_type == DataType.OLDDECIMAL or self.data_type == DataType.DECIMAL:
-            return lambda buf: buf.read_float_length_encoded()
+            return "read_float_length_encoded"
         if self.ext_type_name == 'json' or self.data_type == DataType.JSON:
-            return lambda buf: json.loads(buf.read_string_length_encoded())
+            return "read_json_length_encoded"
         if self.charset == 63:
-            return lambda buf: buf.read_length_buffer()
+            return "read_length_buffer"
         if self.flags & 2048 > 0:
-            return lambda buf: buf.read_set_length_encoded()
-        return lambda buf: buf.read_string_length_encoded()
+            return "read_set_length_encoded"
+        return "read_string_length_encoded"

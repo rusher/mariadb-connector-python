@@ -1,3 +1,4 @@
+import json
 import struct
 from datetime import date, datetime, time
 from struct import unpack
@@ -69,17 +70,36 @@ class ReadableByteBuf:
         return self.read_long()
 
     def read_int_length_encoded(self) -> int:
-        length = self.read_length()
-        if length is None:
-            return None
-        self.pos += length
+        length = self.buf[self.pos]
+        if length < 0xfb:
+            self.pos += length + 1
+        else:
+            self.pos += 1
+            if length == 0xfb:
+                return None
+            if length == 0xfc:
+                length = self.read_unsigned_short()
+            if length == 0xfd:
+                length = self.read_unsigned_medium()
+            else:
+                length = self.read_long()
+            self.pos += length
         return int(self.view[self.pos - length: self.pos])
 
     def read_float_length_encoded(self) -> float:
-        length = self.read_length()
-        if length is None:
-            return None
-        self.pos += length
+        length = self.buf[self.pos]
+        if length < 0xfb:
+            self.pos += length + 1
+        else:
+            if length == 0xfb:
+                return None
+            if length == 0xfc:
+                length = self.read_unsigned_short()
+            if length == 0xfd:
+                length = self.read_unsigned_medium()
+            else:
+                length = self.read_long()
+            self.pos += length
         return float(self.view[self.pos - length: self.pos])
 
     def read_date_length_encoded(self) -> date:
@@ -131,6 +151,9 @@ class ReadableByteBuf:
             return None
         self.pos += length
         return str(self.view[self.pos - length: self.pos], 'utf-8')
+
+    def read_json_length_encoded(self):
+        return json.loads(self.read_string_length_encoded())
 
     def read_set_length_encoded(self):
         length = self.read_length()

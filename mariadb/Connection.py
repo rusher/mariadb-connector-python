@@ -11,16 +11,13 @@ from mariadb.util.constant import ConnectionState, ServerStatus
 
 
 class Connection:
-    CALLABLE_STATEMENT_PATTERN = "^(\\s*\\{)?\\s*((\\?\\s*=)?(\\s*/\\*([^*]|\\*[^/])*\\*/)*\\s*call(\\s*/\\*([^*]|\\*[^/])*\\*/)*\\s*((((`[^`]+`)|([^`}]+))\\.)?((`[^`]+`)|([^`}(]+)))\\s*(\\(.*\\))?(\\s*/\\*([^*]|\\*[^/])*\\*/)*\\s*(#.*)?)\\s*(}\\s*)?$"
+
+    __slots__ = ('conf', 'lock', '__client')
 
     def __init__(self, conf, lock: RLock, client: Client):
         self.conf = conf
         self.lock = lock
         self.__client = client
-
-    def cancel_current_query(self):
-        cli = Client(self.conf, self.__client.host_address, threading.RLock, True)
-        cli.execute(QueryPacket("KILL QUERY " + str(self.__client.context.thread_id)))
 
     def cursor(self) -> Cursor:
         return Cursor(self.__client, self.lock)

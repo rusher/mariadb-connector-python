@@ -22,17 +22,17 @@ def run_test(tests, conn, paramstyle):
 def test_suite(paramstyle):
     is_mysql= int(os.environ.get('TEST_MYSQL', '1'))
     ts= [
-        {'label': 'str_fetchloop', 'method': str_fetchloop},
-        {'label': 'str_fetchall', 'method': str_fetchall},
+        # {'label': 'str_fetchloop', 'method': str_fetchloop},
+        # {'label': 'str_fetchall', 'method': str_fetchall},
         {'label': 'num_fetchloop', 'method': num_fetchloop},
-        {'label': 'num_fetchall', 'method': num_fetchall},
-        {'label': 'select 1', 'method': select_1},
-        {'label': 'select param', 'method': select_param},
-        {'label': 'bulk: insert/update/delete', 'method': bulk},
+        # {'label': 'num_fetchall', 'method': num_fetchall},
+        # {'label': 'select 1', 'method': select_1},
+        # {'label': 'select param', 'method': select_param},
+        # {'label': 'bulk: insert/update/delete', 'method': bulk},
     ]
-    if is_mysql == 1:
-        ts.append({'label': 'select 1 mysql user', 'method': select_1_mysql_user})
-        ts.append({'label': 'do 1', 'method': do1})
-        ts.append({'label': 'Select <10 cols of 100 chars> from_seq_1_to_100000', 'method':
-            select_10_cols_from_seq_1_to_10000})
+    # if is_mysql == 1:
+    #     ts.append({'label': 'select 1 mysql user', 'method': select_1_mysql_user})
+    #     ts.append({'label': 'do 1', 'method': do1})
+    #     ts.append({'label': 'Select <10 cols of 100 chars> from_seq_1_to_100000', 'method':
+    #         select_10_cols_from_seq_1_to_10000})
     return ts
