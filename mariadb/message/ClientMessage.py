@@ -27,9 +27,9 @@ class ClientMessage:
     def can_skip_meta(self) -> bool:
         return False
 
-    def read_completion(self, cursor, fetch_size: int, reader: PacketReader, writer: PacketWriter,
-                    context: Context, exception_factory: ExceptionFactory, lock: RLock):
-        buf = reader.read_packet()
+    def read_msg_result(self, cursor, fetch_size: int, reader: PacketReader, writer: PacketWriter,
+                    context: Context, exception_factory: ExceptionFactory):
+        buf = reader.get_packet_from_socket()
         header = buf.get_unsigned_byte()
         if header == 0x00:
             # *********************************************************************************************************
@@ -62,8 +62,7 @@ class ClientMessage:
                     reader,
                     writer,
                     context,
-                    exception_factory,
-                    lock)
+                    exception_factory)
             except IOError as f:
                 writer.write_empty_packet()
                 self.read_packet(
@@ -72,8 +71,7 @@ class ClientMessage:
                     reader,
                     writer,
                     context,
-                    exception_factory,
-                    lock)
+                    exception_factory)
                 raise exception_factory.with_sql(self.description()).create("Could not send file : " + f.getMessage(),
                                                                             "HY000", f)
 
@@ -91,14 +89,14 @@ class ClientMessage:
                 # read columns information's
                 ci = [None] * field_count
                 for i in range(field_count):
-                    ci[i] = Column.decode(reader.read_packet(), context.extended_info)
+                    ci[i] = Column.decode(reader.get_packet_from_socket(), context.extended_info)
 
             if can_skip_meta and not skip_meta:
                 cursor.update_meta(ci)
 
             # intermediate EOF
             if not context.eof_deprecated:
-                reader.read_packet()
+                reader.get_packet_from_socket()
 
             # read resultSet
             # if fetch_size != 0:

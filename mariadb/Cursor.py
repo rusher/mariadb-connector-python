@@ -96,7 +96,7 @@ class Cursor:
                 self.__curr_result.close()
                 if self.__curr_result.streaming() and (
                         self.__client.context.server_status & ServerStatus.MORE_RESULTS_EXISTS) > 0:
-                    self.__client.read_streaming_results(self.__results, self.__arraysize)
+                    self.__client.read_streaming_results(self.__results)
             finally:
                 self.__lock.release()
         while len(self.__results) > 0:

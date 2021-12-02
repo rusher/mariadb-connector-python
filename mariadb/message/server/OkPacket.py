@@ -41,3 +41,6 @@ class OkPacket:
                         break
                     else:
                         buf.skip(buf.read_length_not_null())
+
+    def loaded(self) -> bool:
+        return True

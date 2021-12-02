@@ -30,3 +30,6 @@ class ErrorPacket:
             server_status = context.server_status
             server_status |= ServerStatus.IN_TRANSACTION
             context.server_status = server_status
+
+    def loaded(self) -> bool:
+        return True

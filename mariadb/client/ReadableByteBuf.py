@@ -3,6 +3,8 @@ import struct
 from datetime import date, datetime, time
 from struct import unpack
 
+SHORT_PARSER = struct.Struct('<h')
+SHORT_UNSIGNED_PARSER = struct.Struct('<H')
 INT_PARSER = struct.Struct('<i')
 INT_UNSIGNED_PARSER = struct.Struct('<I')
 LONG_PARSER = struct.Struct('<q')
@@ -10,10 +12,9 @@ LONG_UNSIGNED_PARSER = struct.Struct('<Q')
 
 
 class ReadableByteBuf:
-    __slots__ = ('sequence', 'pos', 'buf', 'limit', 'view')
+    __slots__ = ('pos', 'buf', 'limit', 'view')
 
-    def __init__(self, sequence, buf, pos, limit):
-        self.sequence = sequence
+    def __init__(self, buf, pos, limit):
         self.pos = pos
         self.buf = buf
         self.view = memoryview(buf)
@@ -62,7 +63,7 @@ class ReadableByteBuf:
         length = self.buf[self.pos]
         self.pos += 1
         if length < 0xfb:
-            return length & 0xff
+            return length
         if length == 0xfc:
             return self.read_unsigned_short()
         if length == 0xfd:
@@ -79,7 +80,7 @@ class ReadableByteBuf:
                 return None
             if length == 0xfc:
                 length = self.read_unsigned_short()
-            if length == 0xfd:
+            elif length == 0xfd:
                 length = self.read_unsigned_medium()
             else:
                 length = self.read_long()
@@ -91,11 +92,12 @@ class ReadableByteBuf:
         if length < 0xfb:
             self.pos += length + 1
         else:
+            self.pos += 1
             if length == 0xfb:
                 return None
             if length == 0xfc:
                 length = self.read_unsigned_short()
-            if length == 0xfd:
+            elif length == 0xfd:
                 length = self.read_unsigned_medium()
             else:
                 length = self.read_long()
@@ -146,10 +148,20 @@ class ReadableByteBuf:
         return time.fromisoformat(val)
 
     def read_string_length_encoded(self):
-        length = self.read_length()
-        if length is None:
-            return None
-        self.pos += length
+        length = self.buf[self.pos]
+        if length < 0xfb:
+            self.pos += length + 1
+        else:
+            self.pos += 1
+            if length == 0xfb:
+                return None
+            if length == 0xfc:
+                length = self.read_unsigned_short()
+            elif length == 0xfd:
+                length = self.read_unsigned_medium()
+            else:
+                length = self.read_long()
+            self.pos += length
         return str(self.view[self.pos - length: self.pos], 'utf-8')
 
     def read_json_length_encoded(self):
@@ -180,11 +192,11 @@ class ReadableByteBuf:
 
     def read_short(self) -> int:
         self.pos += 2
-        return ((self.buf[self.pos - 2] & 0xff) + ((self.buf[self.pos - 1] & 0xff) << 8))
+        return SHORT_PARSER.unpack_from(self.buf, self.pos - 2)[0]
 
     def read_unsigned_short(self) -> int:
         self.pos += 2
-        return ((self.buf[self.pos - 2] & 0xff) + ((self.buf[self.pos - 1] & 0xff) << 8)) & 0xffff
+        return (self.buf[self.pos - 2] & 0xff) + ((self.buf[self.pos - 1] & 0xff) << 8)
 
     def read_medium(self) -> int:
         value = self.read_unsigned_medium()
@@ -256,7 +268,7 @@ class ReadableByteBuf:
         length = self.read_length_not_null()
         tmp = bytearray(length)
         self.read_bytes(tmp)
-        return ReadableByteBuf(self.sequence, tmp, 0, length)
+        return ReadableByteBuf(tmp, 0, length)
 
     def read_string(self, length):
         self.pos += length

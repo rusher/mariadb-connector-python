@@ -89,3 +89,6 @@ class InitialHandshakePacket:
             server_status,
             server_mariadb,
             authentication_plugin_type)
+
+    def loaded(self) -> bool:
+        return True

@@ -29,7 +29,7 @@ class Result:
 
 
     def read_next(self) -> tuple:
-        buf = self.reader.read_packet()
+        buf = self.reader.get_packet_from_socket()
         header = buf.get_unsigned_byte()
         if header == 0xFF:
             self.loaded = True
@@ -66,17 +66,17 @@ class Result:
             if (null_bitmap[int((i + 2) / 8)] & (1 << ((i + 2) % 8))) > 0:
                 self.res[i] = None
             else:
-                self.res[i] = getattr(buf, parse_fct)()
+                self.res[i] = parse_fct(buf)
         return tuple(self.res)
 
     def decode_text(self, buf: ReadableByteBuf) -> tuple:
         for i, parse_fct in enumerate(self.parse_fcts):
-            self.res[i] = getattr(buf, parse_fct)()
+            self.res[i] = parse_fct(buf)
         return tuple(self.res)
 
     def skip_remaining(self):
         while True:
-            buf = self.reader.read_packet()
+            buf = self.reader.get_packet_from_socket()
             header = buf.get_unsigned_byte()
             if header == 0xFF:
                 self.loaded = True
@@ -86,7 +86,7 @@ class Result:
             elif header == 0xFE:
                 if (self.context.eof_deprecated and len(buf) < 16777215) or (
                         not self.context.eof_deprecated and len(buf) < 8):
-                    read_buf = ReadableByteBuf(None, buf, 0, buf.length)
+                    read_buf = ReadableByteBuf(buf, 0, buf.length)
 
                     if not self.context.eof_deprecated:
                         # EOF_Packet

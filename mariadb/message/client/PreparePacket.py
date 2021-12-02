@@ -19,16 +19,17 @@ class PreparePacket(ClientMessage):
         self.client = client
 
     def encode(self, writer: PacketWriter, context: Context) -> int:
+        sql_bytes = self.sql.encode()
         writer.init_packet()
         writer.write_byte(0x16)
-        writer.write_string(self.sql)
+        writer.write_bytes(sql_bytes, len(sql_bytes))
         writer.flush()
         return 1
 
-    def read_completion(self, cursor, fetch_size: int, reader: PacketReader, writer: PacketWriter,
-                        context: Context, exception_factory: ExceptionFactory, lock: RLock):
+    def read_msg_result(self, cursor, fetch_size: int, reader: PacketReader, writer: PacketWriter,
+                        context: Context, exception_factory: ExceptionFactory):
 
-        buf = reader.read_packet()
+        buf = reader.get_packet_from_socket()
         #*********************************************************************************************************
         # ERROR response
         #*********************************************************************************************************

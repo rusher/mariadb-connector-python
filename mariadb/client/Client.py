@@ -9,8 +9,6 @@ from mariadb.client.PacketReader import PacketReader
 from mariadb.client.PacketWriter import PacketWriter
 from mariadb.client.PrepareLruCache import PrepareLruCache
 from mariadb.client.ReadAheadBufferedStream import ReadAheadBufferedStream
-from mariadb.client.result.StreamingResult import StreamingResult
-from mariadb.client.util.MutableInt import MutableInt
 from mariadb.message.ClientMessage import ClientMessage
 from mariadb.message.client.ClosePreparePacket import ClosePreparePacket
 from mariadb.message.client.HandshakeResponse import HandshakeResponse
@@ -24,12 +22,11 @@ from mariadb.util.constant import Capabilities, ServerStatus
 class Client:
     logger = logging.getLogger(__name__)
     __slots__ = (
-    'sequence', 'compression_sequence', 'lock', 'conf', 'host_address', 'closed', 'stream_cursor', 'stream_msg',
+    'sequence', 'lock', 'conf', 'host_address', 'closed', 'stream_cursor', 'stream_msg',
     'reader', 'writer', 'socket', 'exception_factory', 'disable_pipeline', 'context')
 
     def __init__(self, conf, host_address: HostAddress, lock: RLock):
-        self.sequence = MutableInt()
-        self.compression_sequence = MutableInt()
+        self.sequence = bytearray(2)
         self.lock = lock
         self.conf = conf
         self.host_address = host_address
@@ -54,15 +51,14 @@ class Client:
             # **********************************************************************
             # assign reader/writer
             # **********************************************************************
-            self.writer = PacketWriter(self.socket, conf.get('max_query_size_to_log'), self.sequence,
-                                       self.compression_sequence)
+            self.writer = PacketWriter(self.socket, conf.get('max_query_size_to_log'), self.sequence)
             self.writer.set_server_thread_id(-1, host_address)
 
             self.reader = PacketReader(ReadAheadBufferedStream(self.socket), conf, self.sequence)
             self.reader.set_server_thread_id(-1, host_address)
 
             # read server handshake
-            buf = self.reader.read_packet()
+            buf = self.reader.get_packet_from_socket()
             if buf.get_byte() == -1:
                 err = ErrorPacket(buf, None)
                 raise self.exception_factory.create(err.message, err.sql_state, err.error_code)
@@ -98,7 +94,7 @@ class Client:
             # **********************************************************************
             # TODO
 
-            buf = self.reader.read_packet()
+            buf = self.reader.get_packet_from_socket()
             header = buf.get_byte() & 0xFF
             if header == 0xFE:
                 # *************************************************************************************
@@ -217,22 +213,8 @@ class Client:
             return server_language
         return 224
 
-    def send_query(self, message: ClientMessage) -> int:
-        self.check_not_closed()
-
-        if Client.logger.isEnabledFor(logging.DEBUG):
-            Client.logger.debug("execute query: {}".format(message.description()))
-
-        try:
-            return message.encode(self.writer, self.context)
-        except MaxAllowedPacketException as e:
-            raise self.exception_factory.with_sql(message.description()).create(
-                "Packet too big for current server max_allowed_packet value", "HZ000", e)
-            destroy_socket()
-        except SQLError as sqle:
-            raise self.exception_factory.with_sql(message.description()).create("Socket error", "08000", sqle)
-
     def execute_pipeline(self, messages: list, stmt=None, fetch_size: int = 0) -> list:
+        self.check_not_closed()
         results = []
         read_counter = 0
         response_msg = [0] * len(messages)
@@ -242,12 +224,19 @@ class Client:
                     results.extend(self.execute(msg, stmt, fetch_size))
             else:
                 for i, msg in enumerate(messages):
-                    response_msg[i] = self.send_query(msg)
+                    if Client.logger.isEnabledFor(logging.DEBUG):
+                        Client.logger.debug("execute query: {}".format(msg.description()))
+                    response_msg[i] = msg.encode(self.writer, self.context)
                 while read_counter < len(messages):
                     read_counter += 1
                     for j in range(response_msg[read_counter - 1]):
                         results.extend(self.read_response(messages[read_counter - 1], stmt, fetch_size))
             return results
+
+        except MaxAllowedPacketException as e:
+            raise self.exception_factory.create(
+                "Packet too big for current server max_allowed_packet value", "HZ000", e)
+            destroy_socket()
         except Exception as e:
             if not self.closed:
                 # read remaining results
@@ -259,20 +248,43 @@ class Client:
                             pass
             raise
 
-    def execute(self, message: ClientMessage, stmt=None, fetch_size: int = 0) -> list:
-        nb_resp = self.send_query(message)
-        if nb_resp == 1:
-            return self.read_response(message, stmt, fetch_size)
-        else:
-            if self.stream_cursor is not None:
-                self.stream_cursor.fetchRemaining()
-                self.stream_cursor = None
-            server_msgs = []
-            while nb_resp > 0:
-                nb_resp -= 1
-                self.read_results(stmt, message, server_msgs, fetch_size)
+    def execute(self, message: ClientMessage, cursor=None, fetch_size: int = 0) -> list:
+        """
+        Execute one command, and read response
+        :param message: command to execute
+        :param cursor: current cursor
+        :param fetch_size: result-set size to read if streaming
+        :return: command response
+        """
+        self.check_not_closed()
 
-        return server_msgs
+        if Client.logger.isEnabledFor(logging.DEBUG):
+            Client.logger.debug("execute query: {}".format(message.description()))
+
+        try:
+            nb_resp = message.encode(self.writer, self.context)
+            if nb_resp == 1:
+                return self.read_response(message, cursor, fetch_size)
+            else:
+                # Bulk Command that was too big, separate into multiple ones
+                if self.stream_cursor is not None:
+                    self.stream_cursor.fetchRemaining()
+                    self.stream_cursor = None
+                server_msgs = []
+                while nb_resp > 0:
+                    nb_resp -= 1
+                    server_msgs.append(self.read_msg_result(cursor, message, fetch_size))
+                    while (self.context.server_status & ServerStatus.MORE_RESULTS_EXISTS) > 0:
+                        server_msgs.append(self.read_msg_result(cursor, message, fetch_size))
+
+            return server_msgs
+        except MaxAllowedPacketException as e:
+            raise self.exception_factory.with_sql(message.description()).create(
+                "Packet too big for current server max_allowed_packet value", "HZ000", e)
+            destroy_socket()
+        except SQLError as sqle:
+            raise self.exception_factory.with_sql(message.description()).create("Socket error", "08000", sqle)
+
 
     def read_response(self, message: ClientMessage, stmt=None, fetch_size: int = 0) -> list:
         self.check_not_closed()
@@ -280,12 +292,11 @@ class Client:
             self.stream_cursor.fetchRemaining()
             self.stream_cursor = None
         server_msgs = []
-        self.read_results(
-            stmt,
-            message,
-            server_msgs,
-            fetch_size)
+        server_msgs.append(self.read_msg_result(stmt, message, fetch_size))
+        while (self.context.server_status & ServerStatus.MORE_RESULTS_EXISTS) > 0:
+            server_msgs.append(self.read_msg_result(stmt, message, fetch_size))
         return server_msgs
+
 
     def close_prepare(self, prepare) -> None:
         self.check_not_closed()
@@ -296,33 +307,36 @@ class Client:
             raise self.exception_factory.create("Socket error during post connection queries: " + e.getMessage(),
                                                 "08000", e)
 
-    def read_streaming_results(self, server_msgs, fetch_size: int):
+    def read_streaming_results(self, cursor_result):
+        """
+        If last command was a streaming result-set not completely read, fetch remaining packets into streaming cursor
+        results before reading current response
+        :param cursor_result: cursor result
+        :return:
+        """
         if self.stream_cursor is not None:
-            self.read_results(self.stream_cursor, self.stream_msg, server_msgs, fetch_size)
-
-    def read_results(self, stmt, message: ClientMessage, server_msgs: list, fetch_size: int) -> None:
-        try:
-            server_msgs.append(self.read_completion(stmt, message, fetch_size))
+            cursor_result.append(self.read_msg_result(self.stream_cursor, self.stream_msg, 0))
             while (self.context.server_status & ServerStatus.MORE_RESULTS_EXISTS) > 0:
-                server_msgs.append(self.read_completion(stmt, message, fetch_size))
-        except IOError as ioe:
-            self.destroy_socket()
-            raise self.exception_factory.with_sql(message.description()).create("Socket error", "08000", ioe)
+                cursor_result.append(self.read_msg_result(self.stream_cursor, self.stream_msg, 0))
 
-    def read_completion(self, stmt, message: ClientMessage, fetch_size: int):
-        server_msg = message.read_completion(
-            stmt,
+    def read_msg_result(self, cursor, message: ClientMessage, fetch_size: int):
+        """
+        read message result: i.e. an OkPacket, a Result for a result-set ...
+        :param cursor: current cursor
+        :param message: message to send
+        :param fetch_size: streaming value
+        :return: message result-set
+        """
+        server_msg = message.read_msg_result(
+            cursor,
             fetch_size,
             self.reader,
             self.writer,
             self.context,
-            self.exception_factory,
-            self.lock)
-        if fetch_size > 0:
-            if isinstance(server_msg, StreamingResult) and not server_msg.loaded():
-                self.stream_cursor = stmt
-                self.stream_msg = message
-
+            self.exception_factory)
+        if not server_msg.loaded():
+            self.stream_cursor = cursor
+            self.stream_msg = message
         return server_msg
 
     def destroy_socket(self) -> None:

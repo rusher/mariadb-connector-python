@@ -23,17 +23,16 @@ class PacketWriter:
     logger = logging.getLogger(__name__)
 
     __slots__ = ('socket', 'initial_buf', 'buf', 'max_query_size_to_log', 'cmd_length',
-                 'sequence', 'compress_sequence', 'pos', 'max_packet_length', 'max_allowed_packet', 'permit_trace',
+                 'sequence', 'pos', 'max_packet_length', 'max_allowed_packet', 'permit_trace',
                  'server_thread_log', 'mark', 'buf_contain_data_after_mark')
 
-    def __init__(self, sock, max_query_size_to_log, sequence, compress_sequence):
+    def __init__(self, sock, max_query_size_to_log, sequence):
         self.socket = sock
         self.initial_buf = bytearray(SMALL_BUFFER_SIZE)
         self.buf = memoryview(self.initial_buf)
         self.max_query_size_to_log = max_query_size_to_log
         self.cmd_length = 0
         self.sequence = sequence
-        self.compress_sequence = compress_sequence
         self.pos = 4
         self.max_packet_length = MAX_PACKET_LENGTH
         self.max_allowed_packet = 1024 * 1024 * 1024
@@ -324,7 +323,7 @@ class PacketWriter:
         return self.mark != -1
 
     def has_flushed(self):
-        return self.sequence.value != -1
+        return self.sequence[0] == 0xff
 
     def flush_buffer_stop_at_mark(self):
         self.end = self.pos
@@ -352,18 +351,18 @@ class PacketWriter:
         return None
 
     def init_packet(self):
-        self.sequence.value = -1
-        self.compress_sequence.value = -1
+        self.sequence[0:1] = [0xff, 0xff]
         self.pos = 4
         self.cmd_length = 0
 
     def write_socket(self, command_end):
         length = self.pos - 4
         if length > 0:
+            self.sequence[0] = self.sequence[0] + 1 & 0xff
             self.buf[0] = length & 0xff
             self.buf[1] = (length >> 8) & 0xff
             self.buf[2] = (length >> 16) & 0xff
-            self.buf[3] = self.sequence.increment_and_get() & 0xff
+            self.buf[3] = self.sequence[0]
 
             self.check_max_allowed_length(length)
 
@@ -383,10 +382,11 @@ class PacketWriter:
             self.pos = 4
 
     def write_empty_packet(self):
+        self.sequence[0] = self.sequence[0] + 1 & 0xff
         self.buf[0] = 0x00
         self.buf[1] = 0x00
         self.buf[2] = 0x00
-        self.buf[3] = self.sequence.increment_and_get() % 256
+        self.buf[3] = self.sequence[0]
 
         if PacketWriter.logger.isEnabledFor(logging.DEBUG):
             trace = LoggerHelper.hex(self.buf, 0, 4)

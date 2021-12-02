@@ -11,9 +11,10 @@ class QueryPacket(ClientMessage):
         self.sql = sql
 
     def encode(self, writer: PacketWriter, context: Context) -> int:
+        sql_bytes = self.sql.encode()
         writer.init_packet()
         writer.write_byte(0x03)
-        writer.write_string(self.sql)
+        writer.write_bytes(sql_bytes, len(sql_bytes))
         writer.flush()
         return 1
 
