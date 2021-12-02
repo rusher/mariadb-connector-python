@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 import logging
 import os
+import time
 import unittest
-
-import pymysql
 
 import mariadb
 
@@ -202,10 +201,16 @@ class TestConnection(unittest.TestCase):
         conn = mariadb.connect(**default_conf)
 
         cursor=conn.cursor()
-
-        for value in range(5):
-            cursor.execute('select col1,col2,col3 from str_test')
-            row= cursor.fetchall()
+        start = time.time()
+        for value in range(1000000):
+            cursor.execute("do '1'")
+            row = cursor.fetchall()
+            del row
+            if (value % 10000 == 0):
+                end = time.time()
+                elapsed = end - start
+                print(f'Temps d\'exécution : {elapsed:.2}ms')
+                start = time.time()
         del cursor
         del conn
 

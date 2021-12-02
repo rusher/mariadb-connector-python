@@ -360,7 +360,8 @@ class PacketWriter:
         return None
 
     def init_packet(self):
-        self.sequence[0:1] = [0xff, 0xff]
+        self.sequence[0] = 0xff
+        self.sequence[1] = 0xff
         self.pos = 4
         self.cmd_length = 0
 
