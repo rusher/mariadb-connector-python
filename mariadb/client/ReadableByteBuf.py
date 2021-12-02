@@ -3,6 +3,7 @@ import struct
 from datetime import date, datetime, time
 from struct import unpack
 
+BYTE_PARSER = struct.Struct('<b')
 SHORT_PARSER = struct.Struct('<h')
 SHORT_UNSIGNED_PARSER = struct.Struct('<H')
 INT_PARSER = struct.Struct('<i')
@@ -174,21 +175,13 @@ class ReadableByteBuf:
         self.pos += length
         return str(self.view[self.pos - length: self.pos], 'utf-8').split(',')
 
-    def skip_identifier(self) -> int:
-        length = self.buf[self.pos] & 0xff
-        if length == 252:
-            self.pos += 1 + self.read_unsigned_short()
-        else:
-            self.pos += 1 + length
-        return self.pos
-
     def read_byte(self):
         self.pos += 1
-        return self.buf[self.pos - 1]
+        return BYTE_PARSER.unpack_from(self.buf, self.pos - 1)[0]
 
     def read_unsigned_byte(self):
         self.pos += 1
-        return self.buf[self.pos - 1] & 0xff
+        return self.buf[self.pos - 1]
 
     def read_short(self) -> int:
         self.pos += 2
@@ -196,29 +189,11 @@ class ReadableByteBuf:
 
     def read_unsigned_short(self) -> int:
         self.pos += 2
-        return (self.buf[self.pos - 2] & 0xff) + ((self.buf[self.pos - 1] & 0xff) << 8)
-
-    def read_medium(self) -> int:
-        value = self.read_unsigned_medium()
-        if (value & 0x800000) != 0:
-            value |= 0xff000000
-        return value
-
-    def read_unsigned_medium(self) -> int:
-        self.pos += 3
-        return (self.buf[self.pos - 3] & 0xff) + ((self.buf[self.pos - 2] & 0xff) << 8) + (
-                (self.buf[self.pos - 1] & 0xff) << 16)
+        return SHORT_UNSIGNED_PARSER.unpack_from(self.buf, self.pos - 2)[0]
 
     def read_int(self) -> int:
         self.pos += 4
         return INT_PARSER.unpack_from(self.buf, self.pos - 4)[0]
-
-    def read_int_be(self) -> int:
-        self.pos += 4
-        return (((self.buf[self.pos - 4] & 0xff) << 24)
-                + ((self.buf[self.pos - 3] & 0xff) << 16)
-                + ((self.buf[self.pos - 2] & 0xff) << 8)
-                + (self.buf[self.pos - 1] & 0xff))
 
     def read_unsigned_int(self):
         self.pos += 4
@@ -231,17 +206,6 @@ class ReadableByteBuf:
     def read_unsigned_long(self):
         self.pos += 8
         return LONG_UNSIGNED_PARSER.unpack_from(self.buf, self.pos - 8)[0]
-
-    def read_long_be(self):
-        self.pos += 8
-        return (((self.buf[self.pos - 8] & 0xff) << 56)
-                + ((self.buf[self.pos - 7] & 0xff) << 48)
-                + ((self.buf[self.pos - 6] & 0xff) << 40)
-                + ((self.buf[self.pos - 5] & 0xff) << 32)
-                + ((self.buf[self.pos - 4] & 0xff) << 24)
-                + ((self.buf[self.pos - 3] & 0xff) << 16)
-                + ((self.buf[self.pos - 2] & 0xff) << 8)
-                + (self.buf[self.pos - 1] & 0xff))
 
     def read_bytes(self, dest):
         length = len(dest)
@@ -308,35 +272,35 @@ class ReadableByteBuf:
         if length == 0:
             return None
         year = self.read_unsigned_short()
-        month = self.read_byte()
-        day_of_month = self.read_byte()
+        month = self.read_unsigned_byte()
+        day_of_month = self.read_unsigned_byte()
         hour, minutes, seconds, microseconds = 0, 0, 0, 0
         if length > 4:
-            hour = self.read_byte()
-            minutes = self.read_byte()
-            seconds = self.read_byte()
+            hour = self.read_unsigned_byte()
+            minutes = self.read_unsigned_byte()
+            seconds = self.read_unsigned_byte()
             if length > 7:
                 microseconds = self.read_unsigned_int()
-        return datetime.datetime(year, month, day_of_month, hour, minutes, seconds, microseconds)
+        return datetime(year, month, day_of_month, hour, minutes, seconds, microseconds)
 
     def read_date(self):
         length = self.read_length()
         if length == 0:
             return None
         year = self.read_unsigned_short()
-        month = self.read_byte()
-        day_of_month = self.read_byte()
-        return datetime.date(year, month, day_of_month)
+        month = self.read_unsigned_byte()
+        day_of_month = self.read_unsigned_byte()
+        return date(year, month, day_of_month)
 
     def read_time(self):
         length = self.read_length()
         if length == 0:
             return None
         self.pos += 3  # negate + days
-        hour = self.read_byte()
-        minutes = self.read_byte()
-        seconds = self.read_byte()
+        hour = self.read_unsigned_byte()
+        minutes = self.read_unsigned_byte()
+        seconds = self.read_unsigned_byte()
         microseconds = 0
         if length > 8:
             microseconds = self.read_unsigned_int()
-        return datetime.time(hour, minutes, seconds, microseconds)
+        return time(hour, minutes, seconds, microseconds)

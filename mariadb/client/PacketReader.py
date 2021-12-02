@@ -1,10 +1,11 @@
 import logging
+import struct
 
 from mariadb.client.ReadableByteBuf import ReadableByteBuf
 from mariadb.util import LoggerHelper
 
 MAX_PACKET_SIZE = 0xffffff
-
+PARSER = struct.Struct("<HBB")
 
 class PacketReader:
     logger = logging.getLogger(__name__)
@@ -23,8 +24,8 @@ class PacketReader:
         # Read 4 byte header
         # ***************************************************
         header, pos_header, end_header = self.stream.read(4)
-        last_packet_length = (header[pos_header] & 0xff) + ((header[pos_header + 1] & 0xff) << 8) + ((header[pos_header + 2] & 0xff) << 16)
-        self.sequence[0] = header[pos_header + 3]
+        first_2b, last_b, self.sequence[0] = PARSER.unpack_from(header, pos_header)
+        last_packet_length = first_2b + (last_b << 16)
 
         # ***************************************************
         # Read content
@@ -33,9 +34,9 @@ class PacketReader:
 
         if PacketReader.logger.isEnabledFor(logging.DEBUG):
             b = bytearray(4)
-            b[0] = last_packet_length & 0xFF
-            b[1] = last_packet_length >> 8
-            b[2] = last_packet_length >> 16
+            b[0] = first_2b[0]
+            b[1] = first_2b[1]
+            b[2] = last_b
             b[3] = self.sequence[0]
             trace = LoggerHelper.hex_header(b, raw, pos, end - pos, self.max_query_size_to_log)
             PacketReader.logger.debug("read: " + self.server_thread_log + "\n" + trace)
@@ -49,8 +50,8 @@ class PacketReader:
         # ***************************************************
         while True:
             header, pos_header, end_header = self.stream.read(4)
-            last_packet_length = (header[pos_header] & 0xff) + ((header[pos_header + 1] & 0xff) << 8) + ((header[pos_header + 2] & 0xff) << 16)
-            self.sequence[0] = header[pos_header + 3]
+            first_2b, last_b, self.sequence[0] = PARSER.unpack_from(header, pos_header)
+            last_packet_length = first_2b + (last_b << 16)
 
             current_len = len(raw)
             new_raw = bytearray(current_len + last_packet_length)
@@ -65,9 +66,9 @@ class PacketReader:
 
             if PacketReader.logger.isEnabledFor(logging.DEBUG):
                 b = bytearray(4)
-                b[0] = last_packet_length & 0xFF
-                b[1] = last_packet_length >> 8
-                b[2] = last_packet_length >> 16
+                b[0] = first_2b[0]
+                b[1] = first_2b[1]
+                b[2] = last_b
                 b[3] = self.sequence[0]
                 trace = LoggerHelper.hex_header(b, raw, 0, last_packet_length, self.max_query_size_to_log)
                 PacketReader.logger.debug("read: " + self.server_thread_log + "\n" + trace)

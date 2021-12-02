@@ -6,7 +6,7 @@ from mariadb.client.DataType import DataType
 from mariadb.client.ReadableByteBuf import ReadableByteBuf
 from mariadb.util.constant import ColumnFlags
 
-INT_PARSER = struct.Struct('<i')
+PARSER = struct.Struct("<HIBHB")
 
 class Column:
     __slots__ = ('data_type', 'saved', 'charset', 'length', 'decimals', 'flags', 'ext_type_name')
@@ -25,7 +25,6 @@ class Column:
     def decode(buf: ReadableByteBuf, extended_info: bool):
 
         saved = buf.save_buf()
-        pos = len(saved) - 12
 
         ext_type_name = None
         # if extended_info:
@@ -42,11 +41,9 @@ class Column:
         #                 sub_packet.skip(sub_packet.read_length())
 
         # buf.skip()  # skip length always 0x0c
-        charset = ((saved[pos] & 0xff) + ((saved[pos + 1] & 0xff) << 8))
-        length, = INT_PARSER.unpack_from(saved, pos + 2)
-        data_type = DataTypeMap.type_map[saved[pos + 6]]
-        flags = (saved[pos + 7] & 0xff + (saved[pos + 8] & 0xff) << 8)
-        decimals = saved[pos + 9]
+        #
+        charset, length, data_type_val , flags , decimals = PARSER.unpack_from(saved, len(saved) - 12)
+        data_type = DataTypeMap.type_map[data_type_val]
 
         # str_buf = buf.buf[0:string_pos[4]]
         return Column(saved, length, data_type, charset, decimals, flags, ext_type_name)

@@ -4,7 +4,6 @@ from mariadb.client.Context import Context
 from mariadb.client.ReadableByteBuf import ReadableByteBuf
 from mariadb.util.constant import Capabilities, StateChange
 
-
 class OkPacket:
     logger = logging.getLogger(__name__)
 

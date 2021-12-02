@@ -1,8 +1,11 @@
+import struct
+
 from mariadb.client.PacketReader import PacketReader
 from mariadb.client.ReadableByteBuf import ReadableByteBuf
 from mariadb.message.server.Column import Column
 from mariadb.util.constant import Capabilities
 
+PARSER = struct.Struct("<IHH")
 
 class PrepareResultPacket:
 
@@ -11,9 +14,7 @@ class PrepareResultPacket:
     def __init__(self, buffer: ReadableByteBuf, reader: PacketReader, context, client):
         buffer.read_byte()
         self.client = client
-        self.statement_id = buffer.read_int()
-        num_columns = buffer.read_unsigned_short()
-        self.num_params = buffer.read_unsigned_short()
+        self.statement_id, num_columns, self.num_params = PARSER.unpack_from(buffer.buf, buffer.pos)
         parameters = [None] * self.num_params
         self.columns = [None] * num_columns
         if self.num_params > 0:
