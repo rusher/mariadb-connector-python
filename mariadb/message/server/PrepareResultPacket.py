@@ -36,5 +36,5 @@ class PrepareResultPacket:
     def decrement_use(self, con) -> None:
         self.close(con)
 
-    def loaded(self) -> bool:
-        return True
+    def streaming(self) -> bool:
+        return False

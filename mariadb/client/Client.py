@@ -334,7 +334,7 @@ class Client:
             self.writer,
             self.context,
             self.exception_factory)
-        if not server_msg.loaded():
+        if server_msg.streaming():
             self.stream_cursor = cursor
             self.stream_msg = message
         return server_msg

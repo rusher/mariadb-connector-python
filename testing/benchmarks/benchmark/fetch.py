@@ -11,7 +11,6 @@ def str_fetchall(loops, conn, paramstyle):
         cursor.execute('select col1,col2,col3 from str_test')
         row= cursor.fetchall()
         del row
-        cursor.execute('do 1')
     del cursor
     return pyperf.perf_counter() - t0
 

@@ -31,5 +31,5 @@ class ErrorPacket:
             server_status |= ServerStatus.IN_TRANSACTION
             context.server_status = server_status
 
-    def loaded(self) -> bool:
-        return True
+    def streaming(self) -> bool:
+        return False

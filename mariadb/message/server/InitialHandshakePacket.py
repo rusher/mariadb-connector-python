@@ -90,5 +90,5 @@ class InitialHandshakePacket:
             server_mariadb,
             authentication_plugin_type)
 
-    def loaded(self) -> bool:
-        return True
+    def streaming(self) -> bool:
+        return False

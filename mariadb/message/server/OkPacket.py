@@ -42,5 +42,5 @@ class OkPacket:
                     else:
                         buf.skip(buf.read_length_not_null())
 
-    def loaded(self) -> bool:
-        return True
+    def streaming(self) -> bool:
+        return False

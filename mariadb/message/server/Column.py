@@ -129,5 +129,5 @@ class Column:
             return lambda buf: buf.read_set_length_encoded()
         return lambda buf: buf.read_string_length_encoded()
 
-    def loaded(self) -> bool:
-        return True
+    def streaming(self) -> bool:
+        return False

@@ -198,18 +198,14 @@ class TestConnection(unittest.TestCase):
             pass
 
     def test_conpy101(self):
-        bb = bytearray(2)
-        for value in range(260):
-            bb[0] = bb[0] + 1 & 0xff
-            print(bb[0])
-
         default_conf = conf()
         conn = mariadb.connect(**default_conf)
 
         cursor=conn.cursor()
 
         for value in range(5):
-            cursor.execute('do 1')
+            cursor.execute('select col1,col2,col3 from str_test')
+            row= cursor.fetchall()
         del cursor
         del conn
 
