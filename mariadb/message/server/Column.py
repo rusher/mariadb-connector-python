@@ -84,15 +84,24 @@ class Column:
             return self.length
 
     def parser(self, binary: bool):
+        print(f"type:{self.data_type} self.is_signed():{self.is_signed()}")
         if binary:
             if self.data_type == DataType.TINYINT:
-                return lambda buf: buf.read_byte() if self.is_signed() else lambda b: b.read_unsigned_byte()
+                if self.is_signed():
+                    return lambda buf: buf.read_byte()
+                return lambda b: b.read_unsigned_byte()
             if self.data_type == DataType.SMALLINT or self.data_type == DataType.YEAR:
-                return lambda buf: buf.read_short() if self.is_signed() else lambda b: b.read_unsigned_short()
+                if self.is_signed():
+                    return lambda buf: buf.read_short()
+                return lambda b: b.read_unsigned_short()
             if self.data_type == DataType.INTEGER or self.data_type == DataType.MEDIUMINT:
-                return lambda buf: buf.read_int() if self.is_signed() else lambda b: b.read_unsigned_int()
+                if self.is_signed():
+                    return lambda buf: buf.read_int()
+                return lambda b: b.read_unsigned_int()
             if self.data_type == DataType.BIGINT:
-                return lambda buf: buf.read_long() if self.is_signed() else lambda b: b.read_unsigned_long()
+                if self.is_signed():
+                    return lambda buf: buf.read_long()
+                return lambda b: b.read_unsigned_long()
             if self.data_type == DataType.FLOAT:
                 return lambda buf: buf.read_float()
             if self.data_type == DataType.DOUBLE:
