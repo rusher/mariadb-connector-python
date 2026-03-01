@@ -248,6 +248,8 @@ jobs:
           cmake --install . --config RelWithDebInfo
           echo "MARIADB_CC_INSTALL_DIR=$MARIADB_CC_INSTALL_DIR" >> $env:GITHUB_ENV
           echo "MARIADB_PLUGIN_DIR=$MARIADB_CC_INSTALL_DIR/lib/mariadb/plugin" >> $env:GITHUB_ENV
+          # Add DLL directory to PATH so libmariadb.dll is found at import time
+          echo "$MARIADB_CC_INSTALL_DIR/bin" >> $env:GITHUB_PATH
 
       - name: Run SQLAlchemy tests (C extension)
         if: ${{ matrix.db-type != 'mysql' || matrix.python == '3.13' || startsWith(matrix.python, '3.13')}}
