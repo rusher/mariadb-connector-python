@@ -20,6 +20,7 @@ Covers:
 
 from __future__ import annotations
 
+import multiprocessing
 import unittest
 
 import mariadb
@@ -39,6 +40,28 @@ def _cache_conn(**extra: object) -> mariadb.Connection:
         "prep_stmt_cache_size": 10,
         **extra,
     })
+
+
+def _fork_child_gc_test(
+    conn: mariadb.Connection,
+    q: object,
+) -> None:
+    """Target for the forked child in test_gc_finalize_in_forked_child_*.
+
+    Must be at module level so it is importable (required by spawn/forkserver).
+    Under fork it is simply called with the inherited connection object.
+    Opens a cursor, lets it go out of scope, then triggers GC.  This used to
+    call mysql_close() via tp_finalize on the shared fd, corrupting the
+    parent's live TCP connection.
+    """
+    import gc
+    cur = conn.cursor(binary=True)
+    cur.execute("SELECT 1")
+    _ = cur.fetchall()
+    del cur
+    gc.collect()
+    gc.collect()
+    q.put("child_done")
 
 
 @_skip_native
@@ -854,26 +877,20 @@ class TestGCFinalizeWithActiveStream(unittest.TestCase):
         very next statement — exactly the failure seen in the SQLAlchemy
         test_alias_pathing teardown, where profile_memory() runs go() inside
         a multiprocessing.Process (fork) and gc.collect() fires in the child.
+
+        This test only makes sense under fork() — spawn creates a fresh process
+        with no shared fd so there is nothing to regress.
         """
-        import gc
-        import multiprocessing
-        import os
+        try:
+            ctx = multiprocessing.get_context("fork")
+        except ValueError:
+            self.skipTest("fork start method not available on this platform")
 
-        result_queue: multiprocessing.Queue = multiprocessing.Queue()
-
-        def child(q: multiprocessing.Queue) -> None:
-            # In the child: open a cursor, let it go out of scope, gc-collect.
-            # This used to call mysql_close() via tp_finalize, closing the
-            # shared socket and corrupting the parent's connection.
-            cur = self.conn.cursor(binary=True)
-            cur.execute("SELECT id FROM t_gc_stream")
-            _ = cur.fetchall()
-            del cur
-            gc.collect()
-            gc.collect()
-            q.put("child_done")
-
-        proc = multiprocessing.Process(target=child, args=(result_queue,))
+        result_queue: multiprocessing.Queue = ctx.Queue()
+        proc = ctx.Process(
+            target=_fork_child_gc_test,
+            args=(self.conn, result_queue),
+        )
         proc.start()
         msg = result_queue.get(timeout=10)
         proc.join(timeout=10)
