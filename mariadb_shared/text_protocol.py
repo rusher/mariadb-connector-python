@@ -332,7 +332,7 @@ def substitute_params(sql: str, parameters: Any, no_backslash_escapes: bool = Fa
                 if cached_conv_func is not None:
                     converted[i] = cached_conv_func(param, no_backslash_escapes)
                 else:
-                    converted[i] = str(param).encode('utf8')
+                    converted[i] = escape_str(str(param), no_backslash_escapes)
             # Interleave SQL parts and converted params (pre-allocated)
             interleaved: list[Any] = [None] * (2 * n_placeholders + 1)
             j = 0
@@ -396,7 +396,7 @@ def substitute_params(sql: str, parameters: Any, no_backslash_escapes: bool = Fa
                 if cached_conv_func is not None:
                     _append(cached_conv_func(param, no_backslash_escapes))
                 else:
-                    _append(str(param).encode('utf8'))
+                    _append(escape_str(str(param), no_backslash_escapes))
 
                 param_idx += 1
                 last_copy = i + 1
@@ -421,7 +421,7 @@ def substitute_params(sql: str, parameters: Any, no_backslash_escapes: bool = Fa
                         if cached_conv_func is not None:
                             _append(cached_conv_func(param, no_backslash_escapes))
                         else:
-                            _append(str(param).encode('utf8'))
+                            _append(escape_str(str(param), no_backslash_escapes))
 
                         param_idx += 1
                         last_copy = i + 2
@@ -451,7 +451,7 @@ def substitute_params(sql: str, parameters: Any, no_backslash_escapes: bool = Fa
                                 if cached_conv_func is not None:
                                     _append(cached_conv_func(param, no_backslash_escapes))
                                 else:
-                                    _append(str(param).encode('utf8'))
+                                    _append(escape_str(str(param), no_backslash_escapes))
                             else:
                                 if params_dict.get(param_name, _MISSING) is _MISSING:
                                     raise ProgrammingError(
@@ -484,7 +484,7 @@ def substitute_params(sql: str, parameters: Any, no_backslash_escapes: bool = Fa
                             if cached_conv_func is not None:
                                 _append(cached_conv_func(param, no_backslash_escapes))
                             else:
-                                _append(str(param).encode('utf8'))
+                                _append(escape_str(str(param), no_backslash_escapes))
                         else:
                             if params_dict.get(param_name, _MISSING) is _MISSING:  # type: ignore[union-attr]
                                 raise ProgrammingError(
@@ -509,14 +509,15 @@ def substitute_params(sql: str, parameters: Any, no_backslash_escapes: bool = Fa
                 if i + 1 < length and _sql[i + 1] not in (33, 77):
                     state = 5
             elif c == 47:  # '/'
-                if last_char == 42:  # '*/'
+                if last_char == 42:  # '*/' (defensive no-op in NORMAL state)
                     state = 0
-                elif last_char == 47:  # '//'
-                    state = 4
             elif c == 35:  # '#'
                 state = 4
             elif c == 45 and last_char == 45:  # '--'
-                state = 4
+                # MySQL/MariaDB: '--' only starts a line comment when the second
+                # dash is followed by whitespace or a control character
+                if i + 1 >= length or _sql[i + 1] <= 0x20:
+                    state = 4
 
         elif state == 1:  # STRING
             if c == 92:  # '\'
@@ -537,7 +538,12 @@ def substitute_params(sql: str, parameters: Any, no_backslash_escapes: bool = Fa
 
         elif state == 5:  # COMMENT
             if last_char == 42 and c == 47:  # '*/'
+                # Reset last_char after closing a block comment so a following
+                # '*' is not re-paired with this '/' into a spurious '/*'
                 state = 0
+                last_char = 0
+                i += 1
+                continue
 
         last_char = c
         i += 1
@@ -649,14 +655,15 @@ def normalize_to_qmark(sql: str) -> Tuple[str, Optional[List[str]]]:
                 elif i + 1 >= length:
                     state = 5
             elif c == 47:
-                if last_char == 42:
+                if last_char == 42:  # '*/' (defensive no-op in NORMAL state)
                     state = 0
-                elif last_char == 47:
-                    state = 4
             elif c == 35:
                 state = 4
             elif c == 45 and last_char == 45:
-                state = 4
+                # '--' starts a comment only when followed by whitespace / a
+                # control character
+                if i + 1 >= length or _sql[i + 1] <= 0x20:
+                    state = 4
 
         elif state == 1:
             if c == 92:
@@ -679,8 +686,12 @@ def normalize_to_qmark(sql: str) -> Tuple[str, Optional[List[str]]]:
                 state = 0
 
         elif state == 5:
-            if last_char == 42 and c == 47:
+            if last_char == 42 and c == 47:  # '*/'
+                # Reset last_char so a following '*' is not re-paired into '/*'.
                 state = 0
+                last_char = 0
+                i += 1
+                continue
 
         last_char = c
         i += 1

@@ -11,6 +11,7 @@ the certificate fingerprint against a hash provided by the server.
 
 import ssl
 import hashlib
+import hmac
 from typing import Optional
 
 
@@ -83,7 +84,45 @@ class SSLFingerprintValidator:
             SHA-256 fingerprint of the certificate, or None if not captured
         """
         return self.fingerprint
-    
+
+    def check_certificate_period(self) -> Optional[str]:
+        """Check the captured certificate's validity period (notBefore/notAfter).
+
+        The fingerprint path runs over an unverified TLS context (CERT_NONE), so
+        the TLS layer never checks the certificate dates. libmariadb checks
+        MARIADB_TLS_VERIFY_PERIOD on *every* path -- including the self-signed /
+        fingerprint one -- so an expired (or not-yet-valid) certificate is
+        rejected even there. Mirror that so we are at least as strict.
+
+        Returns a human-readable reason when the certificate is outside its
+        validity window, or None when it is valid (or cannot be parsed / the
+        cryptography library is unavailable, in which case we fall back to the
+        fingerprint-hash check rather than failing closed on a parse quirk).
+        """
+        if not self.cert_der:
+            return None
+        try:
+            from cryptography import x509
+            cert = x509.load_der_x509_certificate(self.cert_der)
+        except Exception:
+            return None
+
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc)
+        # cryptography >= 42 exposes timezone-aware *_utc accessors; older
+        # versions return naive UTC datetimes.
+        not_before = getattr(cert, "not_valid_before_utc", None)
+        not_after = getattr(cert, "not_valid_after_utc", None)
+        if not_before is None or not_after is None:
+            not_before = cert.not_valid_before.replace(tzinfo=datetime.timezone.utc)
+            not_after = cert.not_valid_after.replace(tzinfo=datetime.timezone.utc)
+
+        if now < not_before:
+            return f"server certificate is not yet valid (not before {not_before.isoformat()})"
+        if now > not_after:
+            return f"server certificate has expired (not after {not_after.isoformat()})"
+        return None
+
     def validate_fingerprint(
         self,
         auth_plugin_hash: bytes,
@@ -123,6 +162,9 @@ class SSLFingerprintValidator:
         
         # Convert to hex for comparison
         calculated_hash_hex = calculated_hash.hex()
-        
-        # Compare (case-insensitive)
-        return calculated_hash_hex.lower() == server_hash_hex.lower()
+
+        # Compare in constant time
+        return hmac.compare_digest(
+            calculated_hash_hex.lower().encode('ascii'),
+            server_hash_hex.lower().encode('ascii'),
+        )

@@ -22,7 +22,7 @@ from mariadb.impl.message.server.error_packet import ErrorPacket
 from mariadb.impl.message.server.eof_packet import EofPacket
 from mariadb.impl.message.server.prepare_stmt_packet import PrepareStmtPacket, CachedPrepareStmtPacket
 from mariadb.impl.message.server.column_definition_packet import ColumnsDefinition
-from .base_client import BaseClient, _find_default_unix_socket, PROTOCOL_TCP
+from .base_client import BaseClient, _find_default_unix_socket, PROTOCOL_TCP, PROTOCOL_SOCKET
 from ..message.server.ok_packet import CharsetMismatchError
 from .context import Context
 from ..message.payload_reader import PayloadReader
@@ -368,6 +368,13 @@ class SyncClient(BaseClient):
                 unix_socket = _find_default_unix_socket()
                 if unix_socket:
                     self.configuration.unix_socket = unix_socket
+                elif self.configuration.protocol == PROTOCOL_SOCKET:
+                    # protocol=SOCKET is a hard request for a Unix socket; do not
+                    # silently fall back to TCP.
+                    raise OperationalError(
+                        "protocol=SOCKET requires a Unix socket but none was found "
+                        "for this platform; pass unix_socket=<path> explicitly."
+                    )
 
             if unix_socket and self.configuration.protocol != PROTOCOL_TCP:
                 self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -384,6 +391,10 @@ class SyncClient(BaseClient):
             if self.socket_timeout:
                 self.socket.settimeout(self.socket_timeout)
 
+        except OperationalError:
+            # A deliberate, already-explanatory error (e.g. protocol=SOCKET with
+            # no available socket)
+            raise
         except Exception as e:
             if self.socket:
                 try:
@@ -467,7 +478,8 @@ class SyncClient(BaseClient):
             # Prepare SSL context with optional fingerprint validation
             ssl_context, self.cert_fingerprint_validator = SSLUtility.prepare_ssl_context(
                 self.configuration,
-                self.context
+                self.context,
+                self.is_local_connection()
             )
             
             # Wrap socket with SSL
@@ -520,6 +532,8 @@ class SyncClient(BaseClient):
             plugin = plugin_factory.initialize(self.configuration.password, auth_data, self.configuration, self.host_address)
             # Store plugin for fingerprint validation
             self.auth_plugin = plugin
+            # Reject unsafe plugins before any credential is transmitted
+            self.check_auth_switch_allowed(plugin_name, plugin_factory, plugin)
             response = plugin.processSync(self.read_payload, self.write_payload, self.context)
             self._handle_authentication(response)
         except DatabaseError as e:
@@ -575,8 +589,8 @@ class SyncClient(BaseClient):
                             message.statement_id = cached_stmt.statement_id  # type: ignore[attr-defined]
                             self.write_payload(message.payload(self.context, self._payload_writer), message.type(), True)
                             self.reset_buffer()
-                            completions = self._read_result(message.is_binary(), config, buffered, cached_stmt)
-                            all_completions.append(completions)                        
+                            completions = self._read_result(message.is_binary(), config, buffered, cached_stmt, sql)
+                            all_completions.append(completions)
                         return all_completions
                 
                 # Not in cache, prepare once and execute all
@@ -608,7 +622,7 @@ class SyncClient(BaseClient):
                         # Read all execute results (even if prepare failed)
                         for message in messages:
                             try:
-                                completions = self._read_result(message.is_binary(), config, buffered, prepare_result)
+                                completions = self._read_result(message.is_binary(), config, buffered, prepare_result, sql)
                                 all_completions.append(completions)
                             except DatabaseError as e:
                                 if not first_error:
@@ -626,7 +640,7 @@ class SyncClient(BaseClient):
                             self.write_payload(message.payload(self.context, self._payload_writer), message.type(), True)
                             self.reset_buffer()
                             try:
-                                completions = self._read_result(message.is_binary(), config, buffered, prepare_result)
+                                completions = self._read_result(message.is_binary(), config, buffered, prepare_result, sql)
                                 all_completions.append(completions)
                             except DatabaseError as e:
                                 if not first_error:
@@ -830,8 +844,11 @@ class SyncClient(BaseClient):
                 "LOAD DATA LOCAL INFILE is disabled. Set local_infile=True in connection parameters to enable it."
             )
 
-        # Validate filename matches the SQL query (security check)
-        if sql and not self._validate_local_filename(sql, filename):
+        # Validate filename matches the LOAD ... LOCAL INFILE in the client's own
+        # statement. Fail closed: a request with no SQL context to validate against
+        # (e.g. the prepared-statement path) must be rejected, never trusted — a
+        # malicious/MitM server could otherwise read an arbitrary client file.
+        if not sql or not self._validate_local_filename(sql, filename):
             # Send empty packet to keep connection state OK
             self.write_payload(bytearray(4), reset_sequence=False)
             raise OperationalError(
@@ -893,13 +910,15 @@ class SyncClient(BaseClient):
         # Escape backslashes in filename for regex
         escaped_filename = re.escape(filename.replace("\\", "\\\\"))
         
-        # Pattern to match LOAD DATA LOCAL INFILE with the specific filename
+        # Pattern to match LOAD DATA LOCAL INFILE with the specific filename.
+        # The SQL keywords are matched case-insensitively, but the filename is
+        # wrapped in a (?-i:...) group so it is matched case-SENSITIVELY
         pattern = (
             r"^((\s[--]|#).*(\r\n|\r|\n)|\s*/\*([^*]|\*[^/])*\*/|.)*"
             r"\s*LOAD\s+(DATA|XML)\s+((LOW_PRIORITY|CONCURRENT)\s+)?"
-            r"LOCAL\s+INFILE\s+['\"]" + escaped_filename + r"['\"]"  
+            r"LOCAL\s+INFILE\s+['\"](?-i:" + escaped_filename + r")['\"]"
         )
-        
+
         return bool(re.search(pattern, sql, re.IGNORECASE))
 
     # =========================================================================

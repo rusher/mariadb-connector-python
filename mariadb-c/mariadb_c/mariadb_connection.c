@@ -28,7 +28,7 @@ char *dsn_keys[]= {
     "client_flag", "plugin_dir",
     "username", "db", "passwd",
     "status_callback", "tls_version",
-    "tls_fp", "tls_fp_list",
+    "tls_fp", "tls_fp_list", "protocol",
     NULL
 };
 
@@ -336,16 +336,20 @@ void MrdbConnection_process_status_info(void *data, enum enum_mariadb_status_inf
       MARIADB_CONST_STRING *key= va_arg(ap, MARIADB_CONST_STRING *);
       MARIADB_CONST_STRING *val= va_arg(ap, MARIADB_CONST_STRING *);
 
-      if (!strncmp(key->str, "character_set_client", key->length) &&
-           strncmp(val->str, "utf8mb4", val->length))
+      if (key->length == strlen("character_set_client") &&
+          !strncmp(key->str, "character_set_client", key->length) &&
+          (val->length != strlen("utf8mb4") ||
+           strncmp(val->str, "utf8mb4", val->length)))
       {
         /* mariadb_throw_exception (PyUnicode_FormatV)
            doesn't support string with length,
            so we need a temporary variable */
         char charset[128];
+        size_t copy_len= val->length < sizeof(charset) ?
+                         val->length : sizeof(charset) - 1;
 
-        memcpy(charset, val->str, val->length);
-        charset[val->length]= 0;
+        memcpy(charset, val->str, copy_len);
+        charset[copy_len]= 0;
         mariadb_throw_exception(NULL, Mariadb_ProgrammingError, 1,
                 "Character set '%s' is not supported", charset);
         goto end;
@@ -413,18 +417,19 @@ MrdbConnection_Initialize(MrdbConnection *self,
          *ssl_key= NULL, *ssl_cert= NULL, *ssl_ca= NULL, *ssl_capath= NULL,
          *ssl_crl= NULL, *ssl_crlpath= NULL, *ssl_cipher= NULL,
          *plugin_dir= NULL, *tls_version= NULL, *tls_fp= NULL, *tls_fp_list= NULL;
-    uint8_t ssl_enforce= 0;
-    unsigned int client_flags= 0, port= 0;
+    /* Secure by default */
+    uint8_t ssl_enforce= 1;
+    unsigned int client_flags= 0, port= 0, protocol= 0;
     unsigned int local_infile= 0xFF;
     unsigned int connect_timeout=10, read_timeout=0, write_timeout=0,
-                 compress= 0, ssl_verify_cert= 0;
+                 compress= 0, ssl_verify_cert= 1;
     PyObject *status_callback= NULL;
 
     /* Initialize all fields first */
     MrdbConnection_init_fields(self);
 
     if (!PyArg_ParseTupleAndKeywords(args, dsnargs,
-                "|zzzzziziiibbzzzzzzzzzzibizzzzOzzz:connect",
+                "|zzzzziziiibbzzzzzzzzzzibizzzzOzzzi:connect",
                 dsn_keys,
                 &dsn, &host, &user, &password, &schema, &port, &socket,
                 &connect_timeout, &read_timeout, &write_timeout,
@@ -435,7 +440,7 @@ MrdbConnection_Initialize(MrdbConnection *self,
                 &ssl_verify_cert, &ssl_enforce,
                 &client_flags, &plugin_dir,
                 &user, &schema, &password, &status_callback,
-                &tls_version, &tls_fp, &tls_fp_list))
+                &tls_version, &tls_fp, &tls_fp_list, &protocol))
     {
         return -1;
     }
@@ -538,6 +543,12 @@ MrdbConnection_Initialize(MrdbConnection *self,
           goto end;
     }
 
+    if (protocol)
+    {
+        if (mysql_options(self->mysql, MYSQL_OPT_PROTOCOL, &protocol))
+          goto end;
+    }
+
     /* set TLS/SSL options */
     if (ssl_enforce || ssl_key || ssl_ca || ssl_cert || ssl_capath || ssl_cipher || tls_version ||
         tls_fp || tls_fp_list)
@@ -546,6 +557,11 @@ MrdbConnection_Initialize(MrdbConnection *self,
                 (const char *)ssl_ca,
                 (const char *)ssl_capath,
                 (const char *)ssl_cipher);
+    else
+        /* No TLS option given. libmariadb is secure-by-default (it would still
+           negotiate and verify TLS), so when the caller explicitly opted out with
+           ssl=False we disable verification below to keep the connection in clear. */
+        ssl_verify_cert= 0;
     if (ssl_crl)
     {
         if (mysql_options(self->mysql, MYSQL_OPT_SSL_CRL, ssl_crl))

@@ -25,8 +25,8 @@ class Configuration:
     socket_timeout: float = 30  # 30 seconds
     connect_timeout: float = 10  # 10 seconds
     
-    # SSL parameters
-    ssl: bool = False
+    # SSL parameters, Secure by default
+    ssl: bool = True
     ssl_key: Optional[str] = None
     ssl_ca: Optional[str] = None
     ssl_cert: Optional[str] = None
@@ -34,7 +34,7 @@ class Configuration:
     ssl_cipher: Optional[str] = None
     ssl_capath: Optional[str] = None
     ssl_crlpath: Optional[str] = None
-    ssl_verify_cert: bool = False
+    ssl_verify_cert: bool = True
     tls_version: Optional[str] = None  # TLS version: 'TLSv1.2', 'TLSv1.3' or 'TLSv1.2,TLSv1.3' (automatically enables SSL)
     
     # Connection behavior
@@ -49,10 +49,7 @@ class Configuration:
     # Timeouts
     query_timeout: int = 0  # No timeout
     max_allowed_packet: int = 16777216  # 16MB
-    
-    # Character encoding
-    character_encoding: str = 'utf8mb4'
-    
+
     # Initialization command
     init_command: Optional[str] = None
     
@@ -193,10 +190,6 @@ class Configuration:
         if 'max_allowed_packet' in params:
             config.max_allowed_packet = int(params['max_allowed_packet'])
         
-        # Character encoding
-        if 'character_encoding' in params or 'charset' in params:
-            config.character_encoding = params.get('character_encoding') or params.get('charset', 'utf8mb4')
-        
         # Initialization command
         if 'init_command' in params:
             config.init_command = params['init_command']
@@ -238,7 +231,7 @@ class Configuration:
             'autocommit', 'read_only',
             'compress', 'binary', 'local_infile',
             'query_timeout', 'max_allowed_packet',
-            'character_encoding', 'charset', 'init_command', 'converter', 'named_tuple', 'dictionary', 'native_object',
+            'init_command', 'converter', 'named_tuple', 'dictionary', 'native_object',
             'cache_prep_stmts', 'prep_stmt_cache_size', 'pipeline', 'client_flag'
         }
         
