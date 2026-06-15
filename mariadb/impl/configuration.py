@@ -25,8 +25,8 @@ class Configuration:
     socket_timeout: float = 30  # 30 seconds
     connect_timeout: float = 10  # 10 seconds
     
-    # SSL parameters
-    ssl: bool = False
+    # SSL parameters, Secure by default
+    ssl: bool = True
     ssl_key: Optional[str] = None
     ssl_ca: Optional[str] = None
     ssl_cert: Optional[str] = None
@@ -34,7 +34,7 @@ class Configuration:
     ssl_cipher: Optional[str] = None
     ssl_capath: Optional[str] = None
     ssl_crlpath: Optional[str] = None
-    ssl_verify_cert: bool = False
+    ssl_verify_cert: bool = True
     tls_version: Optional[str] = None  # TLS version: 'TLSv1.2', 'TLSv1.3' or 'TLSv1.2,TLSv1.3' (automatically enables SSL)
     
     # Connection behavior
