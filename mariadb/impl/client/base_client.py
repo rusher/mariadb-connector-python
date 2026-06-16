@@ -360,6 +360,11 @@ class BaseClient(ABC):
         Raises:
             OperationalError: If fingerprint validation fails
         """
+        # The fingerprint pins the self-signed certificate at the INITIAL connect
+        # A later re-authentication (change_user) runs over that same.
+        if self.connected:
+            return
+
         # Only validate if we have a fingerprint (self-signed cert scenario)
         if not self.cert_fingerprint_validator or not self.cert_fingerprint_validator.get_fingerprint():
             return

@@ -6,6 +6,7 @@ pytest configuration for MariaDB Connector/Python tests
 This file contains shared fixtures and configuration for all tests.
 """
 
+from logging import config
 import os
 import pytest
 
@@ -25,6 +26,10 @@ def get_test_config():
     if os.environ.get('TEST_REQUIRE_TLS'):
         if os.environ.get('TEST_REQUIRE_TLS') == "1":
             config["ssl"] = True
+    
+    if os.environ.get('TEST_DISABLE_TLS'):
+        if os.environ.get('TEST_DISABLE_TLS') == "1":
+            config["ssl"] = False
     
     # Optional pool reset configuration
     if os.environ.get('TEST_RESET_SESSION'):
