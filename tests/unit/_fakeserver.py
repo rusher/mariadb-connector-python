@@ -8,6 +8,7 @@ A tiny in-process MySQL/MariaDB wire-protocol fake server for unit tests.
 import socket
 import struct
 import threading
+import time
 
 # ---- capability flags -------------------------------------------------------
 CLIENT_PROTOCOL_41 = 0x00000200
@@ -281,13 +282,31 @@ def recv_one_packet(conn):
 # ---------------------------------------------------------------------------
 # Server + scripted handler
 # ---------------------------------------------------------------------------
+def send_chunked(conn, data, chunk_size=1, delay=0.002):
+    """Send data in small chunks with a delay between them, so the peer's
+    non-blocking reads see only partial data. This forces async"""
+    for i in range(0, len(data), chunk_size):
+        conn.sendall(data[i:i + chunk_size])
+        if i + chunk_size < len(data):
+            time.sleep(delay)
+
+
 def scripted_handler(on_query=None, on_prepare=None, on_execute=None, on_bulk=None,
-                     extended_caps=0):
+                     extended_caps=0, slow=False, chunk_size=1, chunk_delay=0.002):
     """Build a connection handler that performs the handshake then dispatches
     each client command to the matching callback. A callback receives the
     request payload (bytes) and returns the response byte blob (with packet
     sequence ids starting at 1). Unhandled/None commands get a default OK, so
-    connect-time setup queries (SET autocommit / SET NAMES) don't desync."""
+    connect-time setup queries (SET autocommit / SET NAMES) don't desync.
+
+    With slow=True, COMMAND responses are dripped in chunk_size-byte chunks
+    (chunk_delay seconds apart) to exercise the async code paths."""
+    def send_response(conn, data):
+        if slow:
+            send_chunked(conn, data, chunk_size, chunk_delay)
+        else:
+            conn.sendall(data)
+
     def handler(conn):
         conn.sendall(handshake_greeting(extended_caps=extended_caps))
         recv_one_packet(conn)                       # client handshake response (discard)
@@ -302,9 +321,9 @@ def scripted_handler(on_query=None, on_prepare=None, on_execute=None, on_bulk=No
             cb = {COM_QUERY: on_query, COM_STMT_PREPARE: on_prepare,
                   COM_STMT_EXECUTE: on_execute, COM_STMT_BULK_EXECUTE: on_bulk}.get(com)
             if cb is None:
-                conn.sendall(ok(start_seq=1))       # default: OK
+                send_response(conn, ok(start_seq=1))    # default: OK
             else:
-                conn.sendall(cb(payload))
+                send_response(conn, cb(payload))
     return handler
 
 
