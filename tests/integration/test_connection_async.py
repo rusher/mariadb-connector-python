@@ -930,7 +930,8 @@ class AsyncTestConnection(unittest.IsolatedAsyncioTestCase):
                 f"GRANT SELECT ON `{conf()['database']}`.* "
                 f"TO 'lenenc_async_cu_user'{get_host_suffix()}"
             )
-            conn = await mariadb.asyncConnect(**conf())
+            # ssl disabled: change_user re-auth can't re-validate a self-signed (zero-conf) cert
+            conn = await mariadb.asyncConnect(**{**conf(), 'ssl': False})
             try:
                 await conn.change_user('lenenc_async_cu_user', long_password, conf()['database'])
                 self.assertEqual(conn.user, 'lenenc_async_cu_user')

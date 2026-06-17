@@ -965,7 +965,8 @@ class TestConnection(unittest.TestCase):
                 f"GRANT SELECT ON `{conf()['database']}`.* "
                 f"TO 'lenenc_cu_user'{get_host_suffix()}"
             )
-            conn = create_connection()
+            # ssl disabled: change_user re-auth can't re-validate a self-signed (zero-conf) cert
+            conn = create_connection({'ssl': False})
             try:
                 conn.change_user('lenenc_cu_user', long_password, conf()['database'])
                 self.assertEqual(conn.user, 'lenenc_cu_user')

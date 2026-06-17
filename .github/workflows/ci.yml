@@ -176,7 +176,7 @@ jobs:
           RUN_LONG_TEST: 1
           MAXSCALE_TAG: ${{ matrix.maxscale-tag || '' }}
           MXS_TLS_PORT: ${{ steps.setup-env.outputs.mxs-tls-port || '' }}
-          TEST_DISABLE_TLS: ${{ matrix.maxscale-tag != '' && '1' || '' }}
+          TEST_DISABLE_TLS: ${{ (matrix.maxscale-tag != '' || matrix.db-type == 'mysql') && '1' || '' }}
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v6
@@ -384,7 +384,7 @@ jobs:
           RUN_LONG_TEST: 1
           MAXSCALE_TAG: ${{ matrix.maxscale-tag || '' }}
           MXS_TLS_PORT: ${{ steps.setup-env.outputs.mxs-tls-port || '' }}
-          TEST_DISABLE_TLS: ${{ matrix.maxscale-tag != '' && '1' || '' }}
+          TEST_DISABLE_TLS: ${{ (matrix.maxscale-tag != '' || matrix.db-type == 'mysql') && '1' || '' }}
 
       - name: Analyze core dumps (Linux)
         if: ${{ always() && startsWith(matrix.os, 'ubuntu') }}
