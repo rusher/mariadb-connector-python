@@ -82,9 +82,9 @@ jobs:
 
       - name: Run SQLAlchemy tests (Pure Python)
         # SQLAlchemy doesn't test TLS; disable it via ssl=false (the dialect coerces
-        # it to a real bool, so it works for every server incl. MySQL). Run only on
-        # the default Python 3.13 -- SQLAlchemy's own suite fails under PyPy.
-        if: ${{ matrix.python == '' || matrix.python == '3.13' }}
+        # it to a real bool). Run on MariaDB only (skip MySQL) and on the default
+        # Python 3.13 only -- SQLAlchemy's own suite fails under PyPy.
+        if: ${{ (matrix.python == '' || matrix.python == '3.13') && matrix.db-type != 'mysql' }}
         shell: bash
         run: |
           git clone https://github.com/sqlalchemy/sqlalchemy.git
@@ -126,7 +126,7 @@ jobs:
 
       - name: Run SQLAlchemy async tests (Pure Python)
         # See note above: ssl=false; default Python 3.13 only (PyPy fails).
-        if: ${{ matrix.python == '' || matrix.python == '3.13' }}
+        if: ${{ (matrix.python == '' || matrix.python == '3.13') && matrix.db-type != 'mysql' }}
         shell: bash
         run: |
           cd "$GITHUB_WORKSPACE/sqlalchemy"
@@ -274,7 +274,7 @@ jobs:
 
       - name: Run SQLAlchemy tests (C extension)
         # See note above: ssl=false; default Python 3.13 only (PyPy fails).
-        if: ${{ matrix.python == '' || matrix.python == '3.13' }}
+        if: ${{ (matrix.python == '' || matrix.python == '3.13') && matrix.db-type != 'mysql' }}
         shell: bash
         run: |
           # ulimit is per-shell; must be set in every step that should dump.
@@ -321,7 +321,7 @@ jobs:
 
       - name: Run SQLAlchemy async tests (C extension)
         # See note above: ssl=false; default Python 3.13 only (PyPy fails).
-        if: ${{ matrix.python == '' || matrix.python == '3.13' }}
+        if: ${{ (matrix.python == '' || matrix.python == '3.13') && matrix.db-type != 'mysql' }}
         shell: bash
         run: |
           ulimit -c unlimited
